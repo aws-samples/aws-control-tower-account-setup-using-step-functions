@@ -45,7 +45,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> None:
 
     response = client.assume_role(
         RoleArn=role_arn,
-        RoleSessionName="s3_public_block",
+        RoleSessionName="s3_bucket_public_block",
         DurationSeconds=900,  # shortest duration 15 minutes
     )
     credentials = response["Credentials"]

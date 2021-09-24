@@ -14,6 +14,7 @@ build:
 
 deploy:
 	sam deploy \
+		--profile jplock-root \
 		--signing-profiles \
 			S3PublicBlockFunction=AccountSetupProfile \
 			DeleteDefaultVpcFunction=AccountSetupProfile \

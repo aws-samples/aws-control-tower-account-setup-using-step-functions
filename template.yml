@@ -114,11 +114,11 @@ Resources:
     Type: "AWS::Serverless::Function"
     Properties:
       CodeSigningConfigArn: !Ref CodeSigningConfig
-      CodeUri: src/s3_public_block
-      Description: DO NOT DELETE - AccountSetup - S3 Public Block
+      CodeUri: src/s3_public_bucket_block
+      Description: DO NOT DELETE - AccountSetup - S3 Public Bucket Block
       Environment:
         Variables:
-          POWERTOOLS_SERVICE_NAME: s3_public_block
+          POWERTOOLS_SERVICE_NAME: s3_public_bucket_block
       Role: !GetAtt S3PublicBlockFunctionRole.Arn
 
   DeleteDefaultVpcFunctionLogGroup:
@@ -428,6 +428,61 @@ Resources:
       Role: !GetAtt ServiceCatalogPortfolioFunctionRole.Arn
       Timeout: 300 # 5 minutes
 
+  SSMPublicDocumentFunctionLogGroup:
+    Type: "AWS::Logs::LogGroup"
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${SSMPublicDocumentFunction}"
+      RetentionInDays: 3
+
+  SSMPublicDocumentFunctionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: !Sub "lambda.${AWS::URLSuffix}"
+          Action: "sts:AssumeRole"
+      Description: !Sub "DO NOT DELETE - Used by Lambda. Created by CloudFormation ${AWS::StackId}"
+      Tags:
+        - Key: "aws-cloudformation:stack-name"
+          Value: !Ref "AWS::StackName"
+        - Key: "aws-cloudformation:stack-id"
+          Value: !Ref "AWS::StackId"
+        - Key: "aws-cloudformation:logical-id"
+          Value: SSMPublicDocumentFunctionRole
+
+  SSMPublicDocumentFunctionPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: CloudWatchLogs
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource: !GetAtt SSMPublicDocumentFunctionLogGroup.Arn
+      Roles:
+        - !Ref SSMPublicDocumentFunctionRole
+
+  SSMPublicDocumentFunction:
+    Type: "AWS::Serverless::Function"
+    Properties:
+      #CodeSigningConfigArn: !Ref CodeSigningConfig
+      CodeUri: src/ssm_public_document_block
+      Description: DO NOT DELETE - AccountSetup - SSM Public Document Block
+      Environment:
+        Variables:
+          POWERTOOLS_SERVICE_NAME: ssm_public_document_block
+      Handler: account_setup.lambda_handler.handler
+      Role: !GetAtt SSMPublicDocumentFunctionRole.Arn
+      Timeout: 300 # 5 minutes
+
   ControlTowerAssumePolicy:
     Type: "AWS::IAM::Policy"
     Properties:
@@ -444,6 +499,7 @@ Resources:
         - !Ref Route53QueryLogsFunctionRole
         - !Ref ECSAccountSettingsFunctionRole
         - !Ref ServiceCatalogPortfolioFunctionRole
+        - !Ref SSMPublicDocumentFunctionRole
 
   RegionPolicy:
     Type: "AWS::IAM::Policy"
@@ -458,6 +514,7 @@ Resources:
       Roles:
         - !Ref ECSAccountSettingsFunctionRole
         - !Ref DeleteDefaultVpcFunctionRole
+        - !Ref SSMPublicDocumentFunctionRole
 
   StateMachine:
     Type: "AWS::Serverless::StateMachine"
@@ -565,6 +622,22 @@ Resources:
                         BackoffRate: 2
                     TimeoutSeconds: 300
                     End: true
+              - StartAt: SSMPublicDocument
+                States:
+                  SSMPublicDocument:
+                    Type: Task
+                    Resource: !GetAtt SSMPublicDocumentFunction.Arn
+                    Retry:
+                      - ErrorEquals:
+                          - ThrottlingException
+                          - Lambda.ServiceException
+                          - Lambda.AWSLambdaException
+                          - Lambda.SdkClientException
+                        IntervalSeconds: 2
+                        MaxAttempts: 6
+                        BackoffRate: 2
+                    TimeoutSeconds: 300
+                    End: true
       Events:
         CreateAccountEvent:
           Type: EventBridgeRule
@@ -594,6 +667,7 @@ Resources:
                 - !GetAtt ECSAccountSettingsFunction.Arn
                 - !GetAtt SSOAssignmentFunction.Arn
                 - !GetAtt ServiceCatalogPortfolioFunction.Arn
+                - !GetAtt SSMPublicDocumentFunction.Arn
       Tags:
         GITHUB_ORG: aws-samples
         GITHUB_REPO: aws-control-tower-account-setup-using-step-functions

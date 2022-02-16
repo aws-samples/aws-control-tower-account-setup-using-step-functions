@@ -47,19 +47,21 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> None:
 
     assumed_session = STS(session).assume_role(account_id)
 
-    logger.info("Deleting default VPC")
+    logger.info(f"Deleting default VPC from {region_name} in {account_id}")
     ec2 = EC2(assumed_session, region_name)
     default_vpc_id = ec2.get_default_vpc_id()
     if default_vpc_id:
         ec2.delete_vpc(default_vpc_id)
 
-    logger.info("Setting default ECS settings")
+    logger.info(f"Setting default ECS settings in {region_name} in {account_id}")
     ecs = ECS(assumed_session, region_name)
     ecs.put_account_setting_default()
 
-    logger.info("Enabling EBS encryption by default")
+    logger.info(f"Enabling EBS encryption by default in {region_name} in {account_id}")
     ec2.enable_ebs_encryption_by_default()
 
-    logger.info("Blocking SSM documents from being made public")
+    logger.info(
+        f"Blocking SSM documents from being made public in {region_name} in {account_id}"
+    )
     ssm = SSM(assumed_session, region_name, account_id)
     ssm.update_service_setting()

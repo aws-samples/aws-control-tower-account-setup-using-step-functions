@@ -46,16 +46,16 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> None:
 
     assumed_session = STS(session).assume_role(account_id)
 
-    logger.info("Updating IAM password policy")
+    logger.info(f"Updating IAM password policy in {account_id}")
     iam = IAM(assumed_session)
     iam.update_account_password_policy()
 
-    logger.info("Blocking public S3 buckets")
+    logger.info(f"Blocking public S3 buckets in {account_id}")
     s3 = S3(assumed_session)
     s3.put_public_access_block(account_id)
 
     logger.info(
-        "Creating CloudWatch Logs resource policy to allow Route 53 query logging in us-east-1"
+        f"Creating CloudWatch Logs resource policy to allow Route 53 query logging in us-east-1 in {account_id}"
     )
     logs = CloudWatchLogs(assumed_session)
     logs.put_resource_policy(account_id)

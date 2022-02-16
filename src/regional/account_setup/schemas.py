@@ -22,6 +22,13 @@
 INPUT = {
     "$schema": "http://json-schema.org/draft-07/schema",
     "type": "object",
-    "properties": {"account_id": {"type": "string"}, "region": {"type": "string"}},
+    "properties": {
+        "account_id": {
+            "type": "string",
+        },
+        "region": {
+            "type": "string",
+        },
+    },
     "required": ["account_id", "region"],
 }

@@ -83,10 +83,10 @@ sam deploy \
   --guided \
   --signing-profiles \
     SSOAssignmentFunction=AccountSetupProfile \
-			ServiceCatalogPortfolioFunction=AccountSetupProfile \
-			RegionalFunction=AccountSetupProfile \
-			AccountFunction=AccountSetupProfile \
-			DependencyLayer=AccountSetupProfile \
+    ServiceCatalogPortfolioFunction=AccountSetupProfile \
+    RegionalFunction=AccountSetupProfile \
+    AccountFunction=AccountSetupProfile \
+    DependencyLayer=AccountSetupProfile \
   --tags "GITHUB_ORG=aws-samples GITHUB_REPO=aws-control-tower-account-setup-using-step-functions"
 ```
 

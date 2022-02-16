@@ -41,7 +41,7 @@ Globals:
       Variables:
         POWERTOOLS_METRICS_NAMESPACE: AccountSetup
         EXECUTION_ROLE_NAME: !Ref ExecutionRoleName
-        LOG_LEVEL: DEBUG
+        LOG_LEVEL: INFO
     Handler: lambda_handler.handler
     Layers:
       - !Ref DependencyLayer
@@ -279,6 +279,7 @@ Resources:
                 eventName:
                   - CreateGroup
       Handler: account_setup.lambda_handler.handler
+      ReservedConcurrentExecutions: 1
       Role: !GetAtt SSOAssignmentFunctionRole.Arn
       Timeout: 300 # 5 minutes
 
@@ -340,6 +341,7 @@ Resources:
           PORTFOLIO_IDS: !Join [",", !Ref PortfolioIds]
           PERMISSION_SET_NAMES: !Join [",", !Ref PermissionSets]
       Handler: account_setup.lambda_handler.handler
+      ReservedConcurrentExecutions: 1
       Role: !GetAtt ServiceCatalogPortfolioFunctionRole.Arn
       Timeout: 300 # 5 minutes
 
@@ -369,7 +371,7 @@ Resources:
             Resource: !GetAtt AccountFunction.Arn
             Retry:
               - ErrorEquals:
-                  - ThrottlingException
+                  - Lambda.TooManyRequestsException
                   - Lambda.ServiceException
                   - Lambda.AWSLambdaException
                   - Lambda.SdkClientException
@@ -407,7 +409,7 @@ Resources:
                   Resource: !GetAtt RegionalFunction.Arn
                   Retry:
                     - ErrorEquals:
-                        - ThrottlingException
+                        - Lambda.TooManyRequestsException
                         - Lambda.ServiceException
                         - Lambda.AWSLambdaException
                         - Lambda.SdkClientException
@@ -423,7 +425,7 @@ Resources:
             Resource: !GetAtt SSOAssignmentFunction.Arn
             Retry:
               - ErrorEquals:
-                  - ThrottlingException
+                  - Lambda.TooManyRequestsException
                   - Lambda.ServiceException
                   - Lambda.AWSLambdaException
                   - Lambda.SdkClientException
@@ -438,7 +440,7 @@ Resources:
             Resource: !GetAtt ServiceCatalogPortfolioFunction.Arn
             Retry:
               - ErrorEquals:
-                  - ThrottlingException
+                  - Lambda.TooManyRequestsException
                   - Lambda.ServiceException
                   - Lambda.AWSLambdaException
                   - Lambda.SdkClientException

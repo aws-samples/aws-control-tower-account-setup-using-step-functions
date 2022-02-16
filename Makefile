@@ -15,12 +15,10 @@ build:
 deploy:
 	sam deploy \
 		--signing-profiles \
-			S3PublicBlockFunction=AccountSetupProfile \
-			DeleteDefaultVpcFunction=AccountSetupProfile \
-			Route53QueryLogsFunction=AccountSetupProfile \
-			ECSAccountSettingsFunction=AccountSetupProfile \
 			SSOAssignmentFunction=AccountSetupProfile \
 			ServiceCatalogPortfolioFunction=AccountSetupProfile \
+			RegionalFunction=AccountSetupProfile \
+			AccountFunction=AccountSetupProfile \
 			DependencyLayer=AccountSetupProfile \
 		--tags "GITHUB_ORG=aws-samples GITHUB_REPO=aws-control-tower-account-setup-using-step-functions"
 

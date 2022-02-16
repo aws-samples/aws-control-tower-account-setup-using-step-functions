@@ -26,6 +26,14 @@ Parameters:
   SigningProfileVersionArn:
     Type: String
     Description: Code Signing Profile Version ARN
+  GitHubOrg:
+    Type: String
+    Description: Source code organization
+    Default: aws-samples
+  GitHubRepo:
+    Type: String
+    Description: Source code repository
+    Default: aws-control-tower-account-setup-using-step-functions
 
 Globals:
   Function:
@@ -33,15 +41,15 @@ Globals:
       Variables:
         POWERTOOLS_METRICS_NAMESPACE: AccountSetup
         EXECUTION_ROLE_NAME: !Ref ExecutionRoleName
-        LOG_LEVEL: DEBUG
+        LOG_LEVEL: INFO
     Handler: lambda_handler.handler
     Layers:
       - !Ref DependencyLayer
     MemorySize: 128 # megabytes
     Runtime: python3.9
     Tags:
-      GITHUB_ORG: aws-samples
-      GITHUB_REPO: aws-control-tower-account-setup-using-step-functions
+      GITHUB_ORG: !Ref GitHubOrg
+      GITHUB_REPO: !Ref GitHubRepo
     Timeout: 20 # seconds
     Tracing: Active
 
@@ -68,15 +76,15 @@ Resources:
       Description: DO NOT DELETE - AccountSetup - Latest versions of common Python packages
       RetentionPolicy: Delete
 
-  S3PublicBlockFunctionLogGroup:
+  AccountFunctionLogGroup:
     Type: "AWS::Logs::LogGroup"
     UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
     Properties:
-      LogGroupName: !Sub "/aws/lambda/${S3PublicBlockFunction}"
+      LogGroupName: !Sub "/aws/lambda/${AccountFunction}"
       RetentionInDays: 3
 
-  S3PublicBlockFunctionRole:
+  AccountFunctionRole:
     Type: "AWS::IAM::Role"
     Properties:
       AssumeRolePolicyDocument:
@@ -93,9 +101,13 @@ Resources:
         - Key: "aws-cloudformation:stack-id"
           Value: !Ref "AWS::StackId"
         - Key: "aws-cloudformation:logical-id"
-          Value: S3PublicBlockFunctionRole
+          Value: AccountFunctionRole
+        - Key: GITHUB_ORG
+          Value: !Ref GitHubOrg
+        - Key: GITHUG_REPO
+          Value: !Ref GitHubRepo
 
-  S3PublicBlockFunctionPolicy:
+  AccountFunctionPolicy:
     Type: "AWS::IAM::Policy"
     Properties:
       PolicyName: CloudWatchLogs
@@ -106,30 +118,32 @@ Resources:
             Action:
               - "logs:CreateLogStream"
               - "logs:PutLogEvents"
-            Resource: !GetAtt S3PublicBlockFunctionLogGroup.Arn
+            Resource: !GetAtt AccountFunctionLogGroup.Arn
       Roles:
-        - !Ref S3PublicBlockFunctionRole
+        - !Ref AccountFunctionRole
 
-  S3PublicBlockFunction:
+  AccountFunction:
     Type: "AWS::Serverless::Function"
     Properties:
       CodeSigningConfigArn: !Ref CodeSigningConfig
-      CodeUri: src/s3_public_block
-      Description: DO NOT DELETE - AccountSetup - S3 Public Block
+      CodeUri: src/account
+      Description: DO NOT DELETE - AccountSetup - Account Configuration
       Environment:
         Variables:
-          POWERTOOLS_SERVICE_NAME: s3_public_block
-      Role: !GetAtt S3PublicBlockFunctionRole.Arn
+          POWERTOOLS_SERVICE_NAME: account
+      Handler: account_setup.lambda_handler.handler
+      ReservedConcurrentExecutions: 1
+      Role: !GetAtt AccountFunctionRole.Arn
 
-  DeleteDefaultVpcFunctionLogGroup:
+  RegionalFunctionLogGroup:
     Type: "AWS::Logs::LogGroup"
     UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
     Properties:
-      LogGroupName: !Sub "/aws/lambda/${DeleteDefaultVpcFunction}"
+      LogGroupName: !Sub "/aws/lambda/${RegionalFunction}"
       RetentionInDays: 3
 
-  DeleteDefaultVpcFunctionRole:
+  RegionalFunctionRole:
     Type: "AWS::IAM::Role"
     Properties:
       AssumeRolePolicyDocument:
@@ -146,9 +160,13 @@ Resources:
         - Key: "aws-cloudformation:stack-id"
           Value: !Ref "AWS::StackId"
         - Key: "aws-cloudformation:logical-id"
-          Value: DeleteDefaultVpcFunctionRole
+          Value: RegionalFunctionRole
+        - Key: GITHUB_ORG
+          Value: !Ref GitHubOrg
+        - Key: GITHUG_REPO
+          Value: !Ref GitHubRepo
 
-  DeleteDefaultVpcFunctionPolicy:
+  RegionalFunctionPolicy:
     Type: "AWS::IAM::Policy"
     Properties:
       PolicyName: CloudWatchLogs
@@ -159,129 +177,22 @@ Resources:
             Action:
               - "logs:CreateLogStream"
               - "logs:PutLogEvents"
-            Resource: !GetAtt DeleteDefaultVpcFunctionLogGroup.Arn
+            Resource: !GetAtt RegionalFunctionLogGroup.Arn
       Roles:
-        - !Ref DeleteDefaultVpcFunctionRole
+        - !Ref RegionalFunctionRole
 
-  DeleteDefaultVpcFunction:
+  RegionalFunction:
     Type: "AWS::Serverless::Function"
     Properties:
       CodeSigningConfigArn: !Ref CodeSigningConfig
-      CodeUri: src/delete_default_vpc
-      Description: DO NOT DELETE - AccountSetup - Delete Default VPC
+      CodeUri: src/regional
+      Description: DO NOT DELETE - AccountSetup - Regional Configuration
       Environment:
         Variables:
-          POWERTOOLS_SERVICE_NAME: delete_default_vpc
-      MemorySize: 1024 # megabytes
-      Role: !GetAtt DeleteDefaultVpcFunctionRole.Arn
-      Timeout: 300 # 5 minutes
-
-  Route53QueryLogsFunctionLogGroup:
-    Type: "AWS::Logs::LogGroup"
-    UpdateReplacePolicy: Delete
-    DeletionPolicy: Delete
-    Properties:
-      LogGroupName: !Sub "/aws/lambda/${Route53QueryLogsFunction}"
-      RetentionInDays: 3
-
-  Route53QueryLogsFunctionRole:
-    Type: "AWS::IAM::Role"
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          Effect: Allow
-          Principal:
-            Service: !Sub "lambda.${AWS::URLSuffix}"
-          Action: "sts:AssumeRole"
-      Description: !Sub "DO NOT DELETE - Used by Lambda. Created by CloudFormation ${AWS::StackId}"
-      Tags:
-        - Key: "aws-cloudformation:stack-name"
-          Value: !Ref "AWS::StackName"
-        - Key: "aws-cloudformation:stack-id"
-          Value: !Ref "AWS::StackId"
-        - Key: "aws-cloudformation:logical-id"
-          Value: Route53QueryLogsFunctionRole
-
-  Route53QueryLogsFunctionPolicy:
-    Type: "AWS::IAM::Policy"
-    Properties:
-      PolicyName: CloudWatchLogs
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Action:
-              - "logs:CreateLogStream"
-              - "logs:PutLogEvents"
-            Resource: !GetAtt Route53QueryLogsFunctionLogGroup.Arn
-      Roles:
-        - !Ref Route53QueryLogsFunctionRole
-
-  Route53QueryLogsFunction:
-    Type: "AWS::Serverless::Function"
-    Properties:
-      CodeSigningConfigArn: !Ref CodeSigningConfig
-      CodeUri: src/route53_query_logs
-      Description: DO NOT DELETE - AccountSetup - Route53 Query Logs
-      Environment:
-        Variables:
-          POWERTOOLS_SERVICE_NAME: route53_query_logs
-      Role: !GetAtt Route53QueryLogsFunctionRole.Arn
-
-  ECSAccountSettingsFunctionLogGroup:
-    Type: "AWS::Logs::LogGroup"
-    UpdateReplacePolicy: Delete
-    DeletionPolicy: Delete
-    Properties:
-      LogGroupName: !Sub "/aws/lambda/${ECSAccountSettingsFunction}"
-      RetentionInDays: 3
-
-  ECSAccountSettingsFunctionRole:
-    Type: "AWS::IAM::Role"
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          Effect: Allow
-          Principal:
-            Service: !Sub "lambda.${AWS::URLSuffix}"
-          Action: "sts:AssumeRole"
-      Description: !Sub "DO NOT DELETE - Used by Lambda. Created by CloudFormation ${AWS::StackId}"
-      Tags:
-        - Key: "aws-cloudformation:stack-name"
-          Value: !Ref "AWS::StackName"
-        - Key: "aws-cloudformation:stack-id"
-          Value: !Ref "AWS::StackId"
-        - Key: "aws-cloudformation:logical-id"
-          Value: ECSAccountSettingsFunctionRole
-
-  ECSAccountSettingsFunctionPolicy:
-    Type: "AWS::IAM::Policy"
-    Properties:
-      PolicyName: CloudWatchLogs
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Action:
-              - "logs:CreateLogStream"
-              - "logs:PutLogEvents"
-            Resource: !GetAtt ECSAccountSettingsFunctionLogGroup.Arn
-      Roles:
-        - !Ref ECSAccountSettingsFunctionRole
-
-  ECSAccountSettingsFunction:
-    Type: "AWS::Serverless::Function"
-    Properties:
-      CodeSigningConfigArn: !Ref CodeSigningConfig
-      CodeUri: src/ecs_account_settings
-      Description: DO NOT DELETE - AccountSetup - ECS Account Settings
-      Environment:
-        Variables:
-          POWERTOOLS_SERVICE_NAME: ecs_account_settings
-      MemorySize: 1024
-      Role: !GetAtt ECSAccountSettingsFunctionRole.Arn
+          POWERTOOLS_SERVICE_NAME: regional
+      Handler: account_setup.lambda_handler.handler
+      ReservedConcurrentExecutions: 30
+      Role: !GetAtt RegionalFunctionRole.Arn
 
   SSOAssignmentFunctionLogGroup:
     Type: "AWS::Logs::LogGroup"
@@ -325,9 +236,9 @@ Resources:
         - Key: "aws-cloudformation:logical-id"
           Value: SSOAssignmentFunctionRole
         - Key: GITHUB_ORG
-          Value: aws-samples
-        - Key: GITHUB_REPO
-          Value: aws-control-tower-account-setup-using-step-functions
+          Value: !Ref GitHubOrg
+        - Key: GITHUG_REPO
+          Value: !Ref GitHubRepo
 
   SSOAssignmentFunctionPolicy:
     Type: "AWS::IAM::Policy"
@@ -368,6 +279,7 @@ Resources:
                 eventName:
                   - CreateGroup
       Handler: account_setup.lambda_handler.handler
+      ReservedConcurrentExecutions: 1
       Role: !GetAtt SSOAssignmentFunctionRole.Arn
       Timeout: 300 # 5 minutes
 
@@ -397,6 +309,10 @@ Resources:
           Value: !Ref "AWS::StackId"
         - Key: "aws-cloudformation:logical-id"
           Value: ServiceCatalogPortfolioFunctionRole
+        - Key: GITHUB_ORG
+          Value: !Ref GitHubOrg
+        - Key: GITHUG_REPO
+          Value: !Ref GitHubRepo
 
   ServiceCatalogPortfolioFunctionPolicy:
     Type: "AWS::IAM::Policy"
@@ -425,6 +341,7 @@ Resources:
           PORTFOLIO_IDS: !Join [",", !Ref PortfolioIds]
           PERMISSION_SET_NAMES: !Join [",", !Ref PermissionSets]
       Handler: account_setup.lambda_handler.handler
+      ReservedConcurrentExecutions: 1
       Role: !GetAtt ServiceCatalogPortfolioFunctionRole.Arn
       Timeout: 300 # 5 minutes
 
@@ -439,132 +356,99 @@ Resources:
             Action: "sts:AssumeRole"
             Resource: !Sub "arn:${AWS::Partition}:iam::*:role/AWSControlTowerExecution"
       Roles:
-        - !Ref S3PublicBlockFunctionRole
-        - !Ref DeleteDefaultVpcFunctionRole
-        - !Ref Route53QueryLogsFunctionRole
-        - !Ref ECSAccountSettingsFunctionRole
         - !Ref ServiceCatalogPortfolioFunctionRole
-
-  RegionPolicy:
-    Type: "AWS::IAM::Policy"
-    Properties:
-      PolicyName: RegionPolicy
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Action: "ec2:DescribeRegions"
-            Resource: "*"
-      Roles:
-        - !Ref ECSAccountSettingsFunctionRole
-        - !Ref DeleteDefaultVpcFunctionRole
+        - !Ref AccountFunctionRole
+        - !Ref RegionalFunctionRole
 
   StateMachine:
     Type: "AWS::Serverless::StateMachine"
     Properties:
       Definition:
-        StartAt: AccountSetup
+        StartAt: Account
         States:
-          AccountSetup:
-            Type: Parallel
+          Account:
+            Type: Task
+            Resource: !GetAtt AccountFunction.Arn
+            Retry:
+              - ErrorEquals:
+                  - Lambda.TooManyRequestsException
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                IntervalSeconds: 2
+                MaxAttempts: 6
+                BackoffRate: 2
+            TimeoutSeconds: 20
+            ResultPath: null # discard result and keep original input
+            Next: DescribeRegions
+          DescribeRegions:
+            Type: Task
+            Resource: "arn:aws:states:::aws-sdk:ec2:describeRegions"
+            Parameters:
+              Filters:
+                - Name: opt-in-status
+                  Values:
+                    - opt-in-not-required
+              AllRegions: false
+            ResultSelector:
+              "RegionNames.$": "$.Regions[*].RegionName"
+            ResultPath: "$.Regions"
+            Next: AllRegions
+          AllRegions:
+            Type: Map
+            ItemsPath: "$.Regions.RegionNames"
+            MaxConcurrency: 0
+            Parameters:
+              "account_id.$": "$.account.accountId"
+              "region.$": "$$.Map.Item.Value"
+            Iterator:
+              StartAt: Regional
+              States:
+                Regional:
+                  Type: Task
+                  Resource: !GetAtt RegionalFunction.Arn
+                  Retry:
+                    - ErrorEquals:
+                        - Lambda.TooManyRequestsException
+                        - Lambda.ServiceException
+                        - Lambda.AWSLambdaException
+                        - Lambda.SdkClientException
+                      IntervalSeconds: 2
+                      MaxAttempts: 6
+                      BackoffRate: 2
+                  TimeoutSeconds: 20
+                  End: true
+            ResultPath: null # discard result and keep original input
+            Next: SSOAssignment
+          SSOAssignment:
+            Type: Task
+            Resource: !GetAtt SSOAssignmentFunction.Arn
+            Retry:
+              - ErrorEquals:
+                  - Lambda.TooManyRequestsException
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                IntervalSeconds: 2
+                MaxAttempts: 6
+                BackoffRate: 2
+            TimeoutSeconds: 300
+            ResultPath: null # discard result and keep original input
+            Next: ServiceCatalogPortfolio
+          ServiceCatalogPortfolio:
+            Type: Task
+            Resource: !GetAtt ServiceCatalogPortfolioFunction.Arn
+            Retry:
+              - ErrorEquals:
+                  - Lambda.TooManyRequestsException
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                IntervalSeconds: 2
+                MaxAttempts: 6
+                BackoffRate: 2
+            TimeoutSeconds: 300
             End: true
-            Branches:
-              - StartAt: S3PublicBlock
-                States:
-                  S3PublicBlock:
-                    Type: Task
-                    Resource: !GetAtt S3PublicBlockFunction.Arn
-                    Retry:
-                      - ErrorEquals:
-                          - ThrottlingException
-                          - Lambda.ServiceException
-                          - Lambda.AWSLambdaException
-                          - Lambda.SdkClientException
-                        IntervalSeconds: 2
-                        MaxAttempts: 6
-                        BackoffRate: 2
-                    TimeoutSeconds: 20
-                    End: true
-              - StartAt: DeleteDefaultVpc
-                States:
-                  DeleteDefaultVpc:
-                    Type: Task
-                    Resource: !GetAtt DeleteDefaultVpcFunction.Arn
-                    Retry:
-                      - ErrorEquals:
-                          - ThrottlingException
-                          - Lambda.ServiceException
-                          - Lambda.AWSLambdaException
-                          - Lambda.SdkClientException
-                        IntervalSeconds: 2
-                        MaxAttempts: 6
-                        BackoffRate: 2
-                    TimeoutSeconds: 300
-                    End: true
-              - StartAt: Route53QueryLogs
-                States:
-                  Route53QueryLogs:
-                    Type: Task
-                    Resource: !GetAtt Route53QueryLogsFunction.Arn
-                    Retry:
-                      - ErrorEquals:
-                          - ThrottlingException
-                          - Lambda.ServiceException
-                          - Lambda.AWSLambdaException
-                          - Lambda.SdkClientException
-                        IntervalSeconds: 2
-                        MaxAttempts: 6
-                        BackoffRate: 2
-                    TimeoutSeconds: 300
-                    End: true
-              - StartAt: ECSAccountSettings
-                States:
-                  ECSAccountSettings:
-                    Type: Task
-                    Resource: !GetAtt ECSAccountSettingsFunction.Arn
-                    Retry:
-                      - ErrorEquals:
-                          - ThrottlingException
-                          - Lambda.ServiceException
-                          - Lambda.AWSLambdaException
-                          - Lambda.SdkClientException
-                        IntervalSeconds: 2
-                        MaxAttempts: 6
-                        BackoffRate: 2
-                    TimeoutSeconds: 300
-                    End: true
-              - StartAt: SSOAssignment
-                States:
-                  SSOAssignment:
-                    Type: Task
-                    Resource: !GetAtt SSOAssignmentFunction.Arn
-                    Retry:
-                      - ErrorEquals:
-                          - ThrottlingException
-                          - Lambda.ServiceException
-                          - Lambda.AWSLambdaException
-                          - Lambda.SdkClientException
-                        IntervalSeconds: 2
-                        MaxAttempts: 6
-                        BackoffRate: 2
-                    TimeoutSeconds: 300
-                    End: true
-              - StartAt: ServiceCatalogPortfolio
-                States:
-                  ServiceCatalogPortfolio:
-                    Type: Task
-                    Resource: !GetAtt ServiceCatalogPortfolioFunction.Arn
-                    Retry:
-                      - ErrorEquals:
-                          - ThrottlingException
-                          - Lambda.ServiceException
-                          - Lambda.AWSLambdaException
-                          - Lambda.SdkClientException
-                        IntervalSeconds: 2
-                        MaxAttempts: 6
-                        BackoffRate: 2
-                    TimeoutSeconds: 300
-                    End: true
       Events:
         CreateAccountEvent:
           Type: EventBridgeRule
@@ -586,17 +470,18 @@ Resources:
         - Version: "2012-10-17"
           Statement:
             - Effect: Allow
+              Action: "ec2:DescribeRegions"
+              Resource: "*"
+            - Effect: Allow
               Action: "lambda:InvokeFunction"
               Resource:
-                - !GetAtt DeleteDefaultVpcFunction.Arn
-                - !GetAtt S3PublicBlockFunction.Arn
-                - !GetAtt Route53QueryLogsFunction.Arn
-                - !GetAtt ECSAccountSettingsFunction.Arn
                 - !GetAtt SSOAssignmentFunction.Arn
                 - !GetAtt ServiceCatalogPortfolioFunction.Arn
+                - !GetAtt RegionalFunction.Arn
+                - !GetAtt AccountFunction.Arn
       Tags:
-        GITHUB_ORG: aws-samples
-        GITHUB_REPO: aws-control-tower-account-setup-using-step-functions
+        GITHUB_ORG: !Ref GitHubOrg
+        GITHUB_REPO: !Ref GitHubRepo
       Tracing:
         Enabled: true
       Type: STANDARD

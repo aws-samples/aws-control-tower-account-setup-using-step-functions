@@ -22,19 +22,21 @@ This project will configure the following settings on a new AWS account provisio
 4. Modifies account-level ECS [settings](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-account-settings.html)
 5. Associates [specific principals](https://docs.aws.amazon.com/servicecatalog/latest/adminguide/catalogs_portfolios_users.html) to shared AWS Service Catalog portfolios
 6. Grants specific AWS SSO [groups](https://docs.aws.amazon.com/singlesignon/latest/userguide/users-groups-provisioning.html) access to the new account
+7. Blocks [public SSM document sharing](https://docs.aws.amazon.com/systems-manager/latest/userguide/ssm-share-block.html)
+8. Enables [EBS encryption by default](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSEncryption.html#encryption-by-default)
+9. Applies an [IAM password policy](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_account-policy.html) that complies with the [CIS AWS Foundations Benchmark](https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cis-controls.html)
 
 ## Architecture
 
 ![architecture](doc/architecture.png)
 
 1. When [AWS Control Tower](https://aws.amazon.com/controltower/) provisions a new account, a [CreateManagedAccount](https://docs.aws.amazon.com/controltower/latest/userguide/lifecycle-events.html#create-managed-account) event is sent to the [Amazon EventBridge](https://aws.amazon.com/eventbridge/) default event bus.
-2. An Amazon EventBridge rule matches the `CreateManagedAccount` event and triggers an [AWS Step Functions](https://aws.amazon.com/step-functions/) state machine that executes [AWS Lambda](https://aws.amazon.com/lambda/) functions in parallel.
-3. The "Delete Default VPC Lambda" function assumes the `AWSControlTowerExecution` IAM role in the new account and deletes the default VPC from every region.
-4. The "Route53 Logs Lambda" function assumes the `AWSControlTowerExecution` IAM role in the new account and creates a CloudWatch Logs resource policy in the us-east-1 region that allows Route53 to write DNS query logs to CloudWatch.
-5. The "Public S3 Block Lambda" function assumes the `AWSControlTowerExecution` IAM role in the new account and enables the account-level [S3 public block setting](https://docs.aws.amazon.com/AmazonS3/latest/userguide/configuring-block-public-access-account.html).
-6. The "ECS Settings Lambda" function assumes the `AWSControlTowerExecution` IAM role in the new account and enables various ECS [settings](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-account-settings.html).
-7. The "Portfolio Share Lambda" function assumes the `AWSControlTowerExecution` IAM role in the new account and accepts shared Service Catalog portfolios in the new account and grants specific principals access to those portfolios.
-8. The "SSO Group Assignment Lambda" function assigns any AWS SSO groups that start with `AWS-O-<PermissionSetName>` access to the new account with the `<PermissionSetName>` permission set.
+2. An Amazon EventBridge rule matches the `CreateManagedAccount` event and triggers an [AWS Step Functions](https://aws.amazon.com/step-functions/) state machine that executes [AWS Lambda](https://aws.amazon.com/lambda/) functions.
+3. The "Account Lambda" function assumes the `AWSControlTowerExecution` IAM role in the new account and adds the account-level [S3 public block setting](https://docs.aws.amazon.com/AmazonS3/latest/userguide/configuring-block-public-access-account.html), creates a CloudWatch Logs resource policy in the us-east-1 region that allows Route 53 to write DNS [query logs](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/query-logs.html#query-logs-configuring) to CloudWatch
+4. Step Functions then uses the [AWS SDK service integration](https://docs.aws.amazon.com/step-functions/latest/dg/supported-services-awssdk.html) to call `ec2:DescribeRegions` to get a list of regions
+5. The "Regional Lambda" function assumes the `AWSControlTowerExecution` IAM role in the new account and enables various ECS [settings](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-account-settings.html), deletes the [default VPC](https://docs.aws.amazon.com/vpc/latest/userguide/default-vpc.html), enables [EBS encryption by default](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSEncryption.html#encryption-by-default), and blocks [public SSM document sharing](https://docs.aws.amazon.com/systems-manager/latest/userguide/ssm-share-block.html) from all regions
+6. The "Portfolio Share Lambda" function assumes the `AWSControlTowerExecution` IAM role in the new account and accepts shared Service Catalog portfolios in the new account and grants specific principals access to those portfolios.
+7. The "SSO Group Assignment Lambda" function assigns any AWS SSO groups following the convention `AWS-O-<PermissionSetName>` access to the new account with the `<PermissionSetName>` permission set. The groups are defined in the `OrganizationGroups` CloudFormation stack parameter.
 
 ## Prerequisites
 
@@ -52,18 +54,21 @@ This project will configure the following settings on a new AWS account provisio
 - [Amazon EventBridge](https://aws.amazon.com/eventbridge/) - Amazon EventBridge is a serverless event bus service that you can use to connect your applications with data from a variety of sources.
 - [AWS Service Catalog](https://aws.amazon.com/servicecatalog/) - AWS Service Catalog allows organizations to create and manage catalogs of IT services that are approved for use on AWS.
 - [AWS Single Sign-On](https://aws.amazon.com/single-sign-on/) - AWS Single Sign-On (AWS SSO) is where you create, or connect, your workforce identities in AWS once and manage access centrally across your AWS organization.
+- [AWS Systems Manager](https://aws.amazon.com/systems-manager/) - Systems Manager provides a unified user interface so you can track and resolve operational issues across your AWS applications and resources from a central place.
 
 ## Usage
 
 #### Parameters
 
-| Parameter                |  Type  |         Default          | Description                                                    |
-| ------------------------ | :----: | :----------------------: | -------------------------------------------------------------- |
-| OrganizationGroups       | String |        us-east-1         | List of AWS SSO groups that should have access to all accounts |
-| ExecutionRoleName        | String | AWSControlTowerExecution | Execution IAM role name                                        |
-| PortfolioIds             | String |          _None_          | Service Catalog Portfolio IDs                                  |
-| PermissionSets           | String |          _None_          | AWS SSO Permission Set names                                   |
-| SigningProfileVersionArn | String |          _None_          | Code Signing Profile Version ARN                               |
+| Parameter                |  Type  |                       Default                        | Description                                                    |
+| ------------------------ | :----: | :--------------------------------------------------: | -------------------------------------------------------------- |
+| OrganizationGroups       | String |                      us-east-1                       | List of AWS SSO groups that should have access to all accounts |
+| ExecutionRoleName        | String |               AWSControlTowerExecution               | Execution IAM role name                                        |
+| PortfolioIds             | String |                        _None_                        | Service Catalog Portfolio IDs                                  |
+| PermissionSets           | String |                        _None_                        | AWS SSO Permission Set names                                   |
+| SigningProfileVersionArn | String |                        _None_                        | Code Signing Profile Version ARN                               |
+| GitHubOrg                | String |                     aws-samples                      | Source code organization                                       |
+| GitHubRepo               | String | aws-control-tower-account-setup-using-step-functions | Source code repository                                         |
 
 #### Installation
 
@@ -77,12 +82,10 @@ sam build
 sam deploy \
   --guided \
   --signing-profiles \
-    S3PublicBlockFunction=AccountSetupProfile \
-    DeleteDefaultVpcFunction=AccountSetupProfile \
-    Route53QueryLogsFunction=AccountSetupProfile \
-    ECSAccountSettingsFunction=AccountSetupProfile \
     SSOAssignmentFunction=AccountSetupProfile \
     ServiceCatalogPortfolioFunction=AccountSetupProfile \
+    RegionalFunction=AccountSetupProfile \
+    AccountFunction=AccountSetupProfile \
     DependencyLayer=AccountSetupProfile \
   --tags "GITHUB_ORG=aws-samples GITHUB_REPO=aws-control-tower-account-setup-using-step-functions"
 ```

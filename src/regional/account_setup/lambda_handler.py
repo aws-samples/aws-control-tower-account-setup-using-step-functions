@@ -58,7 +58,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> None:
     ecs.put_account_setting_default()
 
     logger.info("Enabling EBS encryption by default")
-    # ec2.enable_ebs_encryption_by_default()
+    ec2.enable_ebs_encryption_by_default()
 
     logger.info("Blocking SSM documents from being made public")
     ssm = SSM(assumed_session, region_name, account_id)

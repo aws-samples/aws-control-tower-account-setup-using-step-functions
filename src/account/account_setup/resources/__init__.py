@@ -19,27 +19,9 @@
 * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from functools import lru_cache
-from typing import Optional
+from .cloudwatch_logs import CloudWatchLogs
+from .iam import IAM
+from .sts import STS
+from .s3 import S3
 
-import boto3
-
-__all__ = ["Organizations"]
-
-
-class Organizations:
-    def __init__(self, session: boto3.Session) -> None:
-        self.client = session.client("organizations")
-
-    @lru_cache
-    def get_account_id(self, name: str) -> Optional[str]:
-        """
-        Return the account ID
-        """
-        paginator = self.client.get_paginator("list_accounts")
-        page_iterator = paginator.paginate(PaginationConfig={"PageSize": 100})
-        for page in page_iterator:
-            for account in page.get("Accounts", []):
-                if account["Name"] == name and account["Status"] == "ACTIVE":
-                    return account["Id"]
-        return None
+__all__ = ["CloudWatchLogs", "IAM", "STS", "S3"]

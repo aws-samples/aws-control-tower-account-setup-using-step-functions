@@ -19,27 +19,23 @@
 * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from functools import lru_cache
-from typing import Optional
-
 import boto3
 
-__all__ = ["Organizations"]
+__all__ = ["ECS"]
 
 
-class Organizations:
-    def __init__(self, session: boto3.Session) -> None:
-        self.client = session.client("organizations")
+class ECS:
+    def __init__(self, session: boto3.Session, region: str) -> None:
+        self.client = session.client("ecs", region_name=region)
 
-    @lru_cache
-    def get_account_id(self, name: str) -> Optional[str]:
-        """
-        Return the account ID
-        """
-        paginator = self.client.get_paginator("list_accounts")
-        page_iterator = paginator.paginate(PaginationConfig={"PageSize": 100})
-        for page in page_iterator:
-            for account in page.get("Accounts", []):
-                if account["Name"] == name and account["Status"] == "ACTIVE":
-                    return account["Id"]
-        return None
+    def put_account_setting_default(self) -> None:
+        names = [
+            "serviceLongArnFormat",
+            "taskLongArnFormat",
+            "containerInstanceLongArnFormat",
+            "awsvpcTrunking",
+            "containerInsights",
+            # "dualStackIPv6", # not yet supported
+        ]
+        for name in names:
+            self.client.put_account_setting_default(name=name, value="enabled")

@@ -19,27 +19,34 @@
 * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from functools import lru_cache
-from typing import Optional
+import json
 
+from aws_lambda_powertools import Tracer
 import boto3
 
-__all__ = ["Organizations"]
+tracer = Tracer()
+__all__ = ["CloudWatchLogs"]
 
 
-class Organizations:
+class CloudWatchLogs:
     def __init__(self, session: boto3.Session) -> None:
-        self.client = session.client("organizations")
+        self.client = session.client("logs", region_name="us-east-1")
 
-    @lru_cache
-    def get_account_id(self, name: str) -> Optional[str]:
-        """
-        Return the account ID
-        """
-        paginator = self.client.get_paginator("list_accounts")
-        page_iterator = paginator.paginate(PaginationConfig={"PageSize": 100})
-        for page in page_iterator:
-            for account in page.get("Accounts", []):
-                if account["Name"] == name and account["Status"] == "ACTIVE":
-                    return account["Id"]
-        return None
+    @tracer.capture_method
+    def put_resource_policy(self, account_id: str) -> None:
+        policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "Route53LogsToCloudWatchLogs",
+                    "Effect": "Allow",
+                    "Principal": {"Service": "route53.amazonaws.com"},
+                    "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+                    "Resource": f"arn:aws:logs:us-east-1:{account_id}:log-group:/aws/route53/*",  # log-group must be in us-east-1
+                }
+            ],
+        }
+
+        self.client.put_resource_policy(
+            policyName="AWSServiceRoleForRoute53", policyDocument=json.dumps(policy)
+        )

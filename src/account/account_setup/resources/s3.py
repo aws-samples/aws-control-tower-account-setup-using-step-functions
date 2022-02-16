@@ -19,27 +19,26 @@
 * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from functools import lru_cache
-from typing import Optional
-
+from aws_lambda_powertools import Tracer
 import boto3
 
-__all__ = ["Organizations"]
+tracer = Tracer()
+
+__all__ = ["S3"]
 
 
-class Organizations:
+class S3:
     def __init__(self, session: boto3.Session) -> None:
-        self.client = session.client("organizations")
+        self.client = session.client("s3control")
 
-    @lru_cache
-    def get_account_id(self, name: str) -> Optional[str]:
-        """
-        Return the account ID
-        """
-        paginator = self.client.get_paginator("list_accounts")
-        page_iterator = paginator.paginate(PaginationConfig={"PageSize": 100})
-        for page in page_iterator:
-            for account in page.get("Accounts", []):
-                if account["Name"] == name and account["Status"] == "ACTIVE":
-                    return account["Id"]
-        return None
+    @tracer.capture_method
+    def put_public_access_block(self, account_id: str) -> None:
+        self.client.put_public_access_block(
+            PublicAccessBlockConfiguration={
+                "BlockPublicAcls": True,
+                "IgnorePublicAcls": True,
+                "BlockPublicPolicy": True,
+                "RestrictPublicBuckets": True,
+            },
+            AccountId=account_id,
+        )

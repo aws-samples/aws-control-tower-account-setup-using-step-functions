@@ -19,50 +19,43 @@
 * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import os
 from typing import Dict, Any
 
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from aws_lambda_powertools.utilities.validation import validator
 import boto3
 
-EXECUTION_ROLE_NAME = os.environ["EXECUTION_ROLE_NAME"]
+from account_setup.resources import IAM, STS, S3, CloudWatchLogs
+from account_setup.schemas import INPUT
+
 tracer = Tracer()
 logger = Logger()
 
 
+@validator(inbound_schema=INPUT)
 @tracer.capture_lambda_handler
 @logger.inject_lambda_context(log_event=True)
 def handler(event: Dict[str, Any], context: LambdaContext) -> None:
 
-    account_id = event.get("account", {}).get("accountId")
-    if not account_id:
-        raise Exception("Account ID not found in event")
+    account_id = event["account"]["accountId"]
 
-    client = boto3.client("sts")
+    logger.append_keys(account_id=account_id)
 
-    role_arn = f"arn:aws:iam::{account_id}:role/{EXECUTION_ROLE_NAME}"
+    session = boto3.Session()
 
-    response = client.assume_role(
-        RoleArn=role_arn,
-        RoleSessionName="s3_bucket_public_block",
-        DurationSeconds=900,  # shortest duration 15 minutes
+    assumed_session = STS(session).assume_role(account_id)
+
+    logger.info("Updating IAM password policy")
+    iam = IAM(assumed_session)
+    iam.update_account_password_policy()
+
+    logger.info("Blocking public S3 buckets")
+    s3 = S3(assumed_session)
+    s3.put_public_access_block(account_id)
+
+    logger.info(
+        "Creating CloudWatch Logs resource policy to allow Route 53 query logging in us-east-1"
     )
-    credentials = response["Credentials"]
-
-    session = boto3.Session(
-        aws_access_key_id=credentials["AccessKeyId"],
-        aws_secret_access_key=credentials["SecretAccessKey"],
-        aws_session_token=credentials["SessionToken"],
-    )
-
-    client = session.client("s3control")
-    client.put_public_access_block(
-        PublicAccessBlockConfiguration={
-            "BlockPublicAcls": True,
-            "IgnorePublicAcls": True,
-            "BlockPublicPolicy": True,
-            "RestrictPublicBuckets": True,
-        },
-        AccountId=account_id,
-    )
+    logs = CloudWatchLogs(assumed_session)
+    logs.put_resource_policy(account_id)

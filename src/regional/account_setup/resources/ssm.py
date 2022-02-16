@@ -19,27 +19,17 @@
 * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from functools import lru_cache
-from typing import Optional
-
 import boto3
 
-__all__ = ["Organizations"]
+__all__ = ["SSM"]
 
 
-class Organizations:
-    def __init__(self, session: boto3.Session) -> None:
-        self.client = session.client("organizations")
+class SSM:
+    def __init__(self, session: boto3.Session, region: str, account_id: str) -> None:
+        self.client = session.client("ssm", region_name=region)
+        self.region = region
+        self.account_id = account_id
 
-    @lru_cache
-    def get_account_id(self, name: str) -> Optional[str]:
-        """
-        Return the account ID
-        """
-        paginator = self.client.get_paginator("list_accounts")
-        page_iterator = paginator.paginate(PaginationConfig={"PageSize": 100})
-        for page in page_iterator:
-            for account in page.get("Accounts", []):
-                if account["Name"] == name and account["Status"] == "ACTIVE":
-                    return account["Id"]
-        return None
+    def update_service_setting(self) -> None:
+        setting_id = f"arn:aws:ssm:{self.region}:{self.account_id}:servicesetting/ssm/documents/console/public-sharing-permission"
+        self.client.update_service_setting(SettingId=setting_id, SettingValue="Disable")

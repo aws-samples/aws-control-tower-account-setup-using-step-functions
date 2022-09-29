@@ -36,7 +36,7 @@ class EC2:
         self.region_name = region
 
     def get_default_vpc_id(self) -> Optional[str]:
-        params = {"Filters": [{"Name": "is-default", "Values": ["true"]}]}
+        params = {"Filters": [{"Name": "isDefault", "Values": ["true"]}]}
 
         response = self.client.describe_vpcs(**params)
         for vpc in response.get("Vpcs", []):
@@ -72,7 +72,19 @@ class EC2:
                 interface.delete()
             subnet.delete()
 
-        # Delete vpc
+        # Network ACLs
+        for nacl in vpc.network_acls.all():
+            if not nacl.is_default:
+                nacl.delete()
+
+        # DHCP Options
+        if vpc.dhcp_options:
+            vpc.associate_dhcp_options(
+                DhcpOptionsId="default"
+            )  # associate no DHCP options
+            vpc.dhcp_options.delete()
+
+        # Delete VPC
         self.client.delete_vpc(VpcId=vpc_id)
         logger.info(f"VPC {vpc_id} and associated resources has been deleted.")
 

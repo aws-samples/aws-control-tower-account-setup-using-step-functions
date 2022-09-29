@@ -29,7 +29,12 @@ __all__ = ["Organizations"]
 
 class Organizations:
     def __init__(self, session: boto3.Session) -> None:
-        self.client = session.client("organizations")
+        # @see https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/organizations.html
+        self.client = session.client(
+            "organizations",
+            region_name="us-east-1",
+            endpoint_url="https://organizations.us-east-1.amazonaws.com",
+        )
 
     @lru_cache
     def get_account_id(self, name: str) -> Optional[str]:

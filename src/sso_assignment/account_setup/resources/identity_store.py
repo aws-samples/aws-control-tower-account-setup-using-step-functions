@@ -19,8 +19,7 @@
 * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from functools import lru_cache
-from typing import Optional
+from typing import Dict
 
 import boto3
 
@@ -32,16 +31,22 @@ class IdentityStore:
         self.client = session.client("identitystore")
         self._identity_store_id = identity_store_id
 
-    @lru_cache
-    def get_group_id(self, name: str) -> Optional[str]:
-        response = self.client.list_groups(
+    def get_groups_by_prefix(self, prefix: str) -> Dict[str, str]:
+        """
+        Return all of the groups that match a given prefix
+        """
+        paginator = self.client.get_paginator("list_groups")
+        page_iterator = paginator.paginate(
             IdentityStoreId=self._identity_store_id,
-            Filters=[{"AttributePath": "DisplayName", "AttributeValue": name}],
+            PaginationConfig={
+                "PageSize": 100,
+            },
         )
-        for group in response.get("Groups", []):
-            return group["GroupId"]
 
-        return None
+        groups: Dict[str, str] = {}
+        for page in page_iterator:
+            for group in page.get("Groups", []):
+                if group["DisplayName"].startswith(prefix):
+                    groups[group["GroupId"]] = group["DisplayName"]
 
-    def clear_groups(self) -> None:
-        self.get_group_id.cache_clear()
+        return groups

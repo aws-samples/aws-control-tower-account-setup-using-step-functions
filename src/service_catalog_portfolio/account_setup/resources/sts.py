@@ -24,6 +24,7 @@ import os
 import boto3
 
 EXECUTION_ROLE_NAME = os.environ["EXECUTION_ROLE_NAME"]
+AWS_PARTITION = os.environ["AWS_PARTITION"]
 
 __all__ = ["STS"]
 
@@ -38,7 +39,7 @@ class STS:
         """
         Assume a role and return a new boto3 session
         """
-        role_arn = f"arn:aws:iam::{account_id}:role/{EXECUTION_ROLE_NAME}"
+        role_arn = f"arn:{AWS_PARTITION}:iam::{account_id}:role/{EXECUTION_ROLE_NAME}"
 
         response = self.client.assume_role(
             RoleArn=role_arn,

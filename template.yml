@@ -253,6 +253,7 @@ Resources:
                 Action:
                   - "organizations:ListAccounts"
                   - "identitystore:GetGroupId"
+                  - "identitystore:ListGroups"
                   - "sso:CreateAccountAssignment"
                   - "sso:DescribePermissionSet"
                   - "sso:DeleteAccountAssignment"

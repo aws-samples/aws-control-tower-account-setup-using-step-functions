@@ -117,6 +117,8 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> None:
         identity_store = IdentityStore(session, identity_store_id)
         organizational_groups = identity_store.get_groups_by_prefix(GROUP_ORG_PREFIX)
 
+        logger.info(f"Found organizational groups: {organizational_groups}")
+
         for group_id, group_name in organizational_groups.items():
             _, permission_set_name = parse_group(group_name)
 

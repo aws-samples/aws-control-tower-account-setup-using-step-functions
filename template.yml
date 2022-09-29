@@ -7,10 +7,6 @@ Transform: "AWS::Serverless-2016-10-31"
 Description: New account provisioning automation
 
 Parameters:
-  OrganizationGroups:
-    Type: CommaDelimitedList
-    Description: List of AWS SSO groups that should have access to all accounts
-    Default: ""
   ExecutionRoleName:
     Type: String
     Description: Execution IAM role name
@@ -42,6 +38,7 @@ Globals:
         POWERTOOLS_METRICS_NAMESPACE: AccountSetup
         EXECUTION_ROLE_NAME: !Ref ExecutionRoleName
         LOG_LEVEL: INFO
+        AWS_PARTITION: !Ref "AWS::Partition"
     Handler: lambda_handler.handler
     Layers:
       - !Ref DependencyLayer
@@ -80,6 +77,11 @@ Resources:
     Type: "AWS::Logs::LogGroup"
     UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W84
+            reason: "Ignoring KMS key"
     Properties:
       LogGroupName: !Sub "/aws/lambda/${AccountFunction}"
       RetentionInDays: 3
@@ -124,6 +126,13 @@ Resources:
 
   AccountFunction:
     Type: "AWS::Serverless::Function"
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W58
+            reason: "Ignoring CloudWatch Logs"
+          - id: W89
+            reason: "Ignoring VPC"
     Properties:
       CodeSigningConfigArn: !Ref CodeSigningConfig
       CodeUri: src/account
@@ -139,6 +148,11 @@ Resources:
     Type: "AWS::Logs::LogGroup"
     UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W84
+            reason: "Ignoring KMS key"
     Properties:
       LogGroupName: !Sub "/aws/lambda/${RegionalFunction}"
       RetentionInDays: 3
@@ -183,6 +197,13 @@ Resources:
 
   RegionalFunction:
     Type: "AWS::Serverless::Function"
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W58
+            reason: "Ignoring CloudWatch Logs"
+          - id: W89
+            reason: "Ignoring VPC"
     Properties:
       CodeSigningConfigArn: !Ref CodeSigningConfig
       CodeUri: src/regional
@@ -198,12 +219,22 @@ Resources:
     Type: "AWS::Logs::LogGroup"
     UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W84
+            reason: "Ignoring KMS key"
     Properties:
       LogGroupName: !Sub "/aws/lambda/${SSOAssignmentFunction}"
       RetentionInDays: 3
 
   SSOAssignmentFunctionRole:
     Type: "AWS::IAM::Role"
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W11
+            reason: "Ignoring wildcard resource"
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -221,7 +252,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - "organizations:ListAccounts"
-                  - "identitystore:ListGroups"
+                  - "identitystore:GetGroupId"
                   - "sso:CreateAccountAssignment"
                   - "sso:DescribePermissionSet"
                   - "sso:DeleteAccountAssignment"
@@ -257,6 +288,13 @@ Resources:
 
   SSOAssignmentFunction:
     Type: "AWS::Serverless::Function"
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W58
+            reason: "Ignoring CloudWatch Logs"
+          - id: W89
+            reason: "Ignoring VPC"
     Properties:
       CodeSigningConfigArn: !Ref CodeSigningConfig
       CodeUri: src/sso_assignment
@@ -264,7 +302,6 @@ Resources:
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: sso_assignment
-          ORGANIZATION_GROUPS: !Join [",", !Ref OrganizationGroups]
       Events:
         CreateGroupEvent:
           Type: EventBridgeRule
@@ -287,6 +324,11 @@ Resources:
     Type: "AWS::Logs::LogGroup"
     UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W84
+            reason: "Ignoring KMS key"
     Properties:
       LogGroupName: !Sub "/aws/lambda/${ServiceCatalogPortfolioFunction}"
       RetentionInDays: 3
@@ -331,6 +373,13 @@ Resources:
 
   ServiceCatalogPortfolioFunction:
     Type: "AWS::Serverless::Function"
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W58
+            reason: "Ignoring CloudWatch Logs"
+          - id: W89
+            reason: "Ignoring VPC"
     Properties:
       CodeSigningConfigArn: !Ref CodeSigningConfig
       CodeUri: src/service_catalog_portfolio

@@ -27,6 +27,8 @@ import boto3
 logger = Logger(child=True)
 tracer = Tracer()
 EXECUTION_ROLE_NAME = os.environ["EXECUTION_ROLE_NAME"]
+AWS_PARTITION = os.environ["AWS_PARTITION"]
+
 
 __all__ = ["STS"]
 
@@ -43,7 +45,7 @@ class STS:
         Assume the AWSControlTowerExecution role in an account
         """
 
-        role_arn = f"arn:aws:iam::{account_id}:role/{EXECUTION_ROLE_NAME}"
+        role_arn = f"arn:{AWS_PARTITION}:iam::{account_id}:role/{EXECUTION_ROLE_NAME}"
 
         logger.info(f"Assuming role {EXECUTION_ROLE_NAME} in {account_id}")
         response = self.client.assume_role(

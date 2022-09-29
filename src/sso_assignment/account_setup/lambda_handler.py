@@ -26,15 +26,14 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 import boto3
 
 from .resources import Organizations, IdentityStore, SSO
-from .utils import parse_group, get_env_list
+from .utils import parse_group
+from .constants import GROUP_ORG_PREFIX
 
 tracer = Tracer()
 logger = Logger()
 
-ORGANIZATION_GROUPS = get_env_list("ORGANIZATION_GROUPS")
 
-
-@tracer.capture_method
+@tracer.capture_method(capture_response=False)
 def create_group_event(event: Dict[str, Any]) -> None:
     """
     Assign the new group to an account and permission set
@@ -91,7 +90,7 @@ def create_group_event(event: Dict[str, Any]) -> None:
         logger.warn(f"Permission Set '{permission_set_name}' not found")
 
 
-@tracer.capture_lambda_handler
+@tracer.capture_lambda_handler(capture_response=False)
 @logger.inject_lambda_context(log_event=True)
 def handler(event: Dict[str, Any], context: LambdaContext) -> None:
 
@@ -116,15 +115,10 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> None:
         identity_store_id = instance["IdentityStoreId"]
 
         identity_store = IdentityStore(session, identity_store_id)
-        identity_store.clear_groups()
+        organizational_groups = identity_store.get_groups_by_prefix(GROUP_ORG_PREFIX)
 
-        for group_name in ORGANIZATION_GROUPS:
+        for group_id, group_name in organizational_groups.items():
             _, permission_set_name = parse_group(group_name)
-
-            group_id = identity_store.get_group_id(group_name)
-            if not group_id:
-                logger.error(f"Group '{group_name}' not found, skipping")
-                continue
 
             permission_set_arn = sso.get_permission_set_arn(
                 instance_arn=instance_arn, name=permission_set_name

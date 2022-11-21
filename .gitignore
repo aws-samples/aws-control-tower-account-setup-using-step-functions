@@ -2,4 +2,6 @@
 .vscode
 .aws-sam
 *.zip
-*.toml
+*.bkp
+.DS_Store
+samconfig.toml

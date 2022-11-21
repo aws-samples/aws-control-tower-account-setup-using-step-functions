@@ -87,6 +87,3 @@ class EC2:
         # Delete VPC
         self.client.delete_vpc(VpcId=vpc_id)
         logger.info(f"VPC {vpc_id} and associated resources has been deleted.")
-
-    def enable_ebs_encryption_by_default(self):
-        self.client.enable_ebs_encryption_by_default()

@@ -73,77 +73,6 @@ Resources:
       Description: DO NOT DELETE - AccountSetup - Latest versions of common Python packages
       RetentionPolicy: Delete
 
-  AccountFunctionLogGroup:
-    Type: "AWS::Logs::LogGroup"
-    UpdateReplacePolicy: Delete
-    DeletionPolicy: Delete
-    Metadata:
-      cfn_nag:
-        rules_to_suppress:
-          - id: W84
-            reason: "Ignoring KMS key"
-    Properties:
-      LogGroupName: !Sub "/aws/lambda/${AccountFunction}"
-      RetentionInDays: 3
-
-  AccountFunctionRole:
-    Type: "AWS::IAM::Role"
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          Effect: Allow
-          Principal:
-            Service: !Sub "lambda.${AWS::URLSuffix}"
-          Action: "sts:AssumeRole"
-      Description: !Sub "DO NOT DELETE - Used by Lambda. Created by CloudFormation ${AWS::StackId}"
-      Tags:
-        - Key: "aws-cloudformation:stack-name"
-          Value: !Ref "AWS::StackName"
-        - Key: "aws-cloudformation:stack-id"
-          Value: !Ref "AWS::StackId"
-        - Key: "aws-cloudformation:logical-id"
-          Value: AccountFunctionRole
-        - Key: GITHUB_ORG
-          Value: !Ref GitHubOrg
-        - Key: GITHUG_REPO
-          Value: !Ref GitHubRepo
-
-  AccountFunctionPolicy:
-    Type: "AWS::IAM::Policy"
-    Properties:
-      PolicyName: CloudWatchLogs
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Action:
-              - "logs:CreateLogStream"
-              - "logs:PutLogEvents"
-            Resource: !GetAtt AccountFunctionLogGroup.Arn
-      Roles:
-        - !Ref AccountFunctionRole
-
-  AccountFunction:
-    Type: "AWS::Serverless::Function"
-    Metadata:
-      cfn_nag:
-        rules_to_suppress:
-          - id: W58
-            reason: "Ignoring CloudWatch Logs"
-          - id: W89
-            reason: "Ignoring VPC"
-    Properties:
-      CodeSigningConfigArn: !Ref CodeSigningConfig
-      CodeUri: src/account
-      Description: DO NOT DELETE - AccountSetup - Account Configuration
-      Environment:
-        Variables:
-          POWERTOOLS_SERVICE_NAME: account
-      Handler: account_setup.lambda_handler.handler
-      ReservedConcurrentExecutions: 1
-      Role: !GetAtt AccountFunctionRole.Arn
-
   RegionalFunctionLogGroup:
     Type: "AWS::Logs::LogGroup"
     UpdateReplacePolicy: Delete
@@ -407,28 +336,82 @@ Resources:
             Resource: !Sub "arn:${AWS::Partition}:iam::*:role/AWSControlTowerExecution"
       Roles:
         - !Ref ServiceCatalogPortfolioFunctionRole
-        - !Ref AccountFunctionRole
         - !Ref RegionalFunctionRole
+        - !Ref StateMachineRole
 
   StateMachine:
     Type: "AWS::Serverless::StateMachine"
     Properties:
       Definition:
-        StartAt: Account
+        StartAt: UpdatePasswordPolicy
         States:
-          Account:
+          UpdatePasswordPolicy:
             Type: Task
-            Resource: !GetAtt AccountFunction.Arn
-            Retry:
-              - ErrorEquals:
-                  - Lambda.TooManyRequestsException
-                  - Lambda.ServiceException
-                  - Lambda.AWSLambdaException
-                  - Lambda.SdkClientException
-                IntervalSeconds: 2
-                MaxAttempts: 6
-                BackoffRate: 2
-            TimeoutSeconds: 20
+            Resource: "arn:aws:states:::aws-sdk:iam:updateAccountPasswordPolicy"
+            Credentials:
+              "RoleArn.$": "States.Format('arn:aws:iam::{}:role/${ExecutionRoleName}', $.account.accountId)"
+            Parameters:
+              MinimumPasswordLength: 14  # https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cis-controls.html#securityhub-cis-controls-1.9
+              RequireSymbols: true  # https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cis-controls.html#securityhub-cis-controls-1.7
+              RequireNumbers: true  # https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cis-controls.html#securityhub-cis-controls-1.8
+              RequireUppercaseCharacters: true  # https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cis-controls.html#securityhub-cis-controls-1.5
+              RequireLowercaseCharacters: true  # https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cis-controls.html#securityhub-cis-controls-1.6
+              AllowUsersToChangePassword: true
+              MaxPasswordAge: 90  # https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cis-controls.html#securityhub-cis-controls-1.11
+              PasswordReusePrevention: 24  # https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cis-controls.html#securityhub-cis-controls-1.10
+              HardExpiry: false
+            ResultPath: null # discard result and keep original input
+            Next: PublicAccessBlock
+          PublicAccessBlock:
+            Type: Task
+            Resource: "arn:aws:states:::aws-sdk:s3control:putPublicAccessBlock"
+            Credentials:
+              "RoleArn.$": "States.Format('arn:aws:iam::{}:role/${ExecutionRoleName}', $.account.accountId)"
+            Parameters:
+              PublicAccessBlockConfiguration:
+                BlockPublicAcls: true
+                IgnorePublicAcls: true
+                BlockPublicPolicy: true
+                RestrictPublicBuckets: true
+              "AccountId.$": $.account.accountId
+            ResultPath: null # discard result and keep original input
+            Next: Route53PolicyDocument
+          Route53PolicyDocument:
+            Type: Pass
+            Result:
+              PolicyDocument: |-
+                \{
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    \{
+                      "Sid": "Route53LogsToCloudWatchLogs",
+                      "Effect": "Allow",
+                      "Principal": \{
+                        "Service": "route53.amazonaws.com"
+                      \},
+                      "Action": [
+                        "logs:CreateLogStream",
+                        "logs:PutLogEvents"
+                      ],
+                      "Resource": "arn:aws:logs:us-east-1:{}:log-group:/aws/route53/*",
+                      "Condition": \{
+                        "StringEquals": \{
+                          "aws:SourceAccount": "{}"
+                        \}
+                      \}
+                    \}
+                  ]
+                \}
+            ResultPath: "$.Policy"
+            Next: Route53LoggingPolicy
+          Route53LoggingPolicy:
+            Type: Task
+            Resource: "arn:aws:states:::aws-sdk:cloudwatchlogs:putResourcePolicy"
+            Credentials:
+              "RoleArn.$": "States.Format('arn:aws:iam::{}:role/${ExecutionRoleName}', $.account.accountId)"
+            Parameters:
+              PolicyName: AWSServiceRoleForRoute53
+              "PolicyDocument.$": States.Format($.Policy.PolicyDocument, $.account.accountId, $.account.accountId)
             ResultPath: null # discard result and keep original input
             Next: DescribeRegions
           DescribeRegions:
@@ -452,8 +435,31 @@ Resources:
               "account_id.$": "$.account.accountId"
               "region.$": "$$.Map.Item.Value"
             Iterator:
-              StartAt: Regional
+              StartAt: EbsEncryptionByDefault
               States:
+                EbsEncryptionByDefault:
+                  Type: Task
+                  Resource: "arn:aws:states:::aws-sdk:ec2:enableEbsEncryptionByDefault"
+                  Credentials:
+                    "RoleArn.$": "States.Format('arn:aws:iam::{}:role/${ExecutionRoleName}', $.account_id)"
+                  Parameters: {}
+                  ResultPath: null # discard result and keep original input
+                  Next: DisableSsmPublicSharing
+                DisableSsmPublicSharing:
+                  Type: Task
+                  Resource: "arn:aws:states:::aws-sdk:ssm:updateServiceSetting"
+                  Credentials:
+                    "RoleArn.$": "States.Format('arn:aws:iam::{}:role/${ExecutionRoleName}', $.account_id)"
+                  Parameters:
+                    "SettingId.$": "States.Format('arn:aws:ssm:{}:{}:servicesetting/ssm/documents/console/public-sharing-permission', $.region, $.account_id)"
+                    SettingValue: Disable
+                  Catch:
+                    - ErrorEquals:
+                        - States.ALL
+                      ResultPath: null # discard result and keep original input
+                      Next: Regional
+                  ResultPath: null # discard result and keep original input
+                  Next: Regional
                 Regional:
                   Type: Task
                   Resource: !GetAtt RegionalFunction.Arn
@@ -499,6 +505,8 @@ Resources:
                 BackoffRate: 2
             TimeoutSeconds: 300
             End: true
+      DefinitionSubstitutions:
+        ExecutionRoleName: !Ref ExecutionRoleName
       Events:
         CreateAccountEvent:
           Type: EventBridgeRule
@@ -528,7 +536,6 @@ Resources:
                 - !GetAtt SSOAssignmentFunction.Arn
                 - !GetAtt ServiceCatalogPortfolioFunction.Arn
                 - !GetAtt RegionalFunction.Arn
-                - !GetAtt AccountFunction.Arn
       Tags:
         GITHUB_ORG: !Ref GitHubOrg
         GITHUB_REPO: !Ref GitHubRepo

@@ -26,7 +26,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.utilities.validation import validator
 import boto3
 
-from account_setup.resources import EC2, ECS, STS, SSM
+from account_setup.resources import EC2, ECS, STS
 from account_setup.schemas import INPUT
 
 tracer = Tracer()
@@ -56,12 +56,3 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> None:
     logger.info(f"Setting default ECS settings in {region_name} in {account_id}")
     ecs = ECS(assumed_session, region_name)
     ecs.put_account_setting_default()
-
-    logger.info(f"Enabling EBS encryption by default in {region_name} in {account_id}")
-    ec2.enable_ebs_encryption_by_default()
-
-    logger.info(
-        f"Blocking SSM documents from being made public in {region_name} in {account_id}"
-    )
-    ssm = SSM(assumed_session, region_name, account_id)
-    ssm.update_service_setting()

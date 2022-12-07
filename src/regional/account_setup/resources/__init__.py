@@ -22,6 +22,5 @@
 from .ec2 import EC2
 from .ecs import ECS
 from .sts import STS
-from .ssm import SSM
 
-__all__ = ["EC2", "ECS", "STS", "SSM"]
+__all__ = ["EC2", "ECS", "STS"]

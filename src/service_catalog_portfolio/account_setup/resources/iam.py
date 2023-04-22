@@ -20,9 +20,12 @@
 """
 
 from functools import lru_cache
-from typing import Optional, Dict
+from typing import Optional, Dict, TYPE_CHECKING
 
 import boto3
+
+if TYPE_CHECKING:
+    from mypy_boto3_iam import IAMClient
 
 __all__ = ["IAM"]
 
@@ -30,9 +33,11 @@ AWS_SSO_ROLE_PREFIX = "AWSReservedSSO_"
 
 
 class IAM:
-    def __init__(self, session: boto3.Session) -> None:
-        self.client = session.client("iam")
-        self._roles = {}
+    def __init__(self, session: Optional[boto3.Session] = None) -> None:
+        if not session:
+            session = boto3._get_default_session()
+        self.client: IAMClient = session.client("iam")
+        self._roles: Dict[str, str] = {}
 
     def get_sso_roles(self) -> Dict[str, str]:
         """
@@ -48,11 +53,7 @@ class IAM:
             for role in page.get("Roles", []):
                 if role["RoleName"].startswith(AWS_SSO_ROLE_PREFIX):
                     # AWSReservedSSO_AWSAdministratorAccess_a1ff75f56dfb0e2f -> AWSAdministratorAccess
-                    permission_set_name = (
-                        role["RoleName"]
-                        .rsplit("_", 1)[0]
-                        .replace(AWS_SSO_ROLE_PREFIX, "")
-                    )
+                    permission_set_name = role["RoleName"].rsplit("_", 1)[0].replace(AWS_SSO_ROLE_PREFIX, "")
                     roles[permission_set_name] = role["Arn"]
 
         self._roles = roles

@@ -19,23 +19,26 @@
 * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from typing import Dict
+from typing import Dict, TYPE_CHECKING
 
 import boto3
+
+if TYPE_CHECKING:
+    from mypy_boto3_identitystore import IdentityStoreClient, ListGroupsPaginator
 
 __all__ = ["IdentityStore"]
 
 
 class IdentityStore:
     def __init__(self, session: boto3.Session, identity_store_id: str) -> None:
-        self.client = session.client("identitystore")
+        self.client: IdentityStoreClient = session.client("identitystore")
         self._identity_store_id = identity_store_id
 
     def get_groups_by_prefix(self, prefix: str) -> Dict[str, str]:
         """
         Return all of the groups that match a given prefix
         """
-        paginator = self.client.get_paginator("list_groups")
+        paginator: ListGroupsPaginator = self.client.get_paginator("list_groups")
         page_iterator = paginator.paginate(
             IdentityStoreId=self._identity_store_id,
             PaginationConfig={

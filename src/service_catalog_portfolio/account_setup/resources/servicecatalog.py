@@ -19,11 +19,14 @@
 * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from typing import Set
+from typing import Set, TYPE_CHECKING, Optional
 
 from aws_lambda_powertools import Logger
 import boto3
 import botocore
+
+if TYPE_CHECKING:
+    from mypy_boto3_servicecatalog import ServiceCatalogClient, ListPrincipalsForPortfolioPaginator
 
 logger = Logger(child=True)
 
@@ -31,23 +34,19 @@ __all__ = ["ServiceCatalog"]
 
 
 class ServiceCatalog:
-    def __init__(self, session: boto3.Session) -> None:
+    def __init__(self, session: Optional[boto3.Session] = None) -> None:
         if not session:
             session = boto3._get_default_session()
-        self.client = session.client("servicecatalog")
+        self.client: ServiceCatalogClient = session.client("servicecatalog")
 
     def accept_portfolio_share(self, portfolio_id: str) -> None:
         try:
-            self.client.accept_portfolio_share(
-                PortfolioId=portfolio_id, PortfolioShareType="AWS_ORGANIZATIONS"
-            )
+            self.client.accept_portfolio_share(PortfolioId=portfolio_id, PortfolioShareType="AWS_ORGANIZATIONS")
         except botocore.exceptions.ClientError:
             logger.exception("Unable to accept portfolio share")
             raise
 
-    def associate_principal_with_portfolio(
-        self, portfolio_id: str, principal_arn: str
-    ) -> None:
+    def associate_principal_with_portfolio(self, portfolio_id: str, principal_arn: str) -> None:
         try:
             self.client.associate_principal_with_portfolio(
                 PortfolioId=portfolio_id,
@@ -58,13 +57,9 @@ class ServiceCatalog:
             logger.exception("Unable to associate princpal with portfolio")
             raise
 
-    def disassociate_principal_from_portfolio(
-        self, portfolio_id: str, principal_arn: str
-    ) -> None:
+    def disassociate_principal_from_portfolio(self, portfolio_id: str, principal_arn: str) -> None:
         try:
-            self.client.disassociate_principal_from_portfolio(
-                PortfolioId=portfolio_id, PrincipalARN=principal_arn
-            )
+            self.client.disassociate_principal_from_portfolio(PortfolioId=portfolio_id, PrincipalARN=principal_arn)
         except botocore.exceptions.ClientError as error:
             if error.response["Error"]["Code"] != "ResourceNotFoundException":
                 logger.exception("Unable to disassociate princpal from portfolio")
@@ -73,7 +68,7 @@ class ServiceCatalog:
     def list_principals_for_portfolio(self, portfolio_id: str) -> Set[str]:
         principals = set()
 
-        paginator = self.client.get_paginator("list_principals_for_portfolio")
+        paginator: ListPrincipalsForPortfolioPaginator = self.client.get_paginator("list_principals_for_portfolio")
         page_iterator = paginator.paginate(PortfolioId=portfolio_id)
         for page in page_iterator:
             for principal in page.get("Principals", []):

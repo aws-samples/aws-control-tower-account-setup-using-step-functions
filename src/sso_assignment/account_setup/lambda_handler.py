@@ -19,7 +19,7 @@
 * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -38,7 +38,7 @@ def create_group_event(event: Dict[str, Any]) -> None:
     """
     Assign the new group to an account and permission set
     """
-    group = event.get("responseElements", {}).get("group", {})
+    group: Dict[str, str] = event.get("responseElements", {}).get("group", {})
     if not group:
         logger.warn("No group found in event")
         return
@@ -71,13 +71,9 @@ def create_group_event(event: Dict[str, Any]) -> None:
     for instance in instances:
         instance_arn = instance["InstanceArn"]
 
-        permission_set_arn = sso.get_permission_set_arn(
-            instance_arn=instance_arn, name=permission_set_name
-        )
+        permission_set_arn = sso.get_permission_set_arn(instance_arn=instance_arn, name=permission_set_name)
         if permission_set_arn:
-            logger.info(
-                f"Assigning {group_name} permission set {permission_set_name} in {account_id}"
-            )
+            logger.info(f"Assigning {group_name} permission set {permission_set_name} in {account_id}")
             sso.create_account_assignment(
                 account_id=account_id,
                 instance_arn=instance_arn,
@@ -93,14 +89,13 @@ def create_group_event(event: Dict[str, Any]) -> None:
 @tracer.capture_lambda_handler(capture_response=False)
 @logger.inject_lambda_context(log_event=True)
 def handler(event: Dict[str, Any], context: LambdaContext) -> None:
-
     # Handle single-account groups
     if event.get("eventName") == "CreateGroup":
         return create_group_event(event)
 
     # Below handles organizational groups
 
-    account_id = event.get("account", {}).get("accountId")
+    account_id: Optional[str] = event.get("account", {}).get("accountId")
     if not account_id:
         raise Exception("Account ID not found in event")
 
@@ -122,18 +117,12 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> None:
         for group_id, group_name in organizational_groups.items():
             _, permission_set_name = parse_group(group_name)
 
-            permission_set_arn = sso.get_permission_set_arn(
-                instance_arn=instance_arn, name=permission_set_name
-            )
+            permission_set_arn = sso.get_permission_set_arn(instance_arn=instance_arn, name=permission_set_name)
             if not permission_set_arn:
-                logger.error(
-                    f"Permission Set '{permission_set_name}' not found, skipping"
-                )
+                logger.error(f"Permission Set '{permission_set_name}' not found, skipping")
                 continue
 
-            logger.info(
-                f"Assigning {group_name} permission set {permission_set_name} in {account_id}"
-            )
+            logger.info(f"Assigning {group_name} permission set {permission_set_name} in {account_id}")
             sso.create_account_assignment(
                 account_id=account_id,
                 instance_arn=instance_arn,

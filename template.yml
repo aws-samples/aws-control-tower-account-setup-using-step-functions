@@ -43,7 +43,7 @@ Globals:
     Layers:
       - !Ref DependencyLayer
     MemorySize: 128 # megabytes
-    Runtime: python3.9
+    Runtime: python3.10
     Tags:
       GITHUB_ORG: !Ref GitHubOrg
       GITHUB_REPO: !Ref GitHubRepo
@@ -64,11 +64,11 @@ Resources:
   DependencyLayer:
     Type: "AWS::Serverless::LayerVersion"
     Metadata:
-      BuildMethod: python3.9
+      BuildMethod: python3.10
     Properties:
       LicenseInfo: MIT-0
       CompatibleRuntimes:
-        - python3.9
+        - python3.10
       ContentUri: dependencies
       Description: DO NOT DELETE - AccountSetup - Latest versions of common Python packages
       RetentionPolicy: Delete

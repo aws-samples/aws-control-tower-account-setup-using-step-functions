@@ -20,11 +20,14 @@
 """
 
 from functools import lru_cache
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TYPE_CHECKING
 
 from aws_lambda_powertools import Logger
 import boto3
 import botocore
+
+if TYPE_CHECKING:
+    from mypy_boto3_sso_admin import SSOAdminClient, ListInstancesPaginator, ListPermissionSetsPaginator
 
 __all__ = ["SSO"]
 
@@ -33,8 +36,8 @@ logger = Logger(child=True)
 
 class SSO:
     def __init__(self, session: boto3.Session) -> None:
-        self.client = session.client("sso-admin")
-        self._permission_sets = {}
+        self.client: SSOAdminClient = session.client("sso-admin")
+        self._permission_sets: Dict[str, str] = {}
         self._instances = []
 
     def list_instances(self) -> Dict[str, str]:
@@ -42,7 +45,7 @@ class SSO:
             return self._instances
 
         instances = []
-        paginator = self.client.get_paginator("list_instances")
+        paginator: ListInstancesPaginator = self.client.get_paginator("list_instances")
         page_iterator = paginator.paginate()
         for page in page_iterator:
             instances.extend(page.get("Instances", []))
@@ -54,13 +57,12 @@ class SSO:
         if instance_arn in self._permission_sets:
             return self._permission_sets[instance_arn]
 
-        permission_sets = {}
+        permission_sets: Dict[str, str] = {}
 
-        paginator = self.client.get_paginator("list_permission_sets")
+        paginator: ListPermissionSetsPaginator = self.client.get_paginator("list_permission_sets")
         page_iterator = paginator.paginate(InstanceArn=instance_arn)
         for page in page_iterator:
             for permission_set_arn in page.get("PermissionSets", []):
-
                 response = self.client.describe_permission_set(
                     InstanceArn=instance_arn, PermissionSetArn=permission_set_arn
                 )
@@ -96,9 +98,7 @@ class SSO:
             return response["AccountAssignmentCreationStatus"]
         except botocore.exceptions.ClientError as error:
             if error.response["Error"]["Code"] != "ConflictException":
-                logger.exception(
-                    f"Unable to add {permission_set_arn} to {principal_id} in {account_id}"
-                )
+                logger.exception(f"Unable to add {permission_set_arn} to {principal_id} in {account_id}")
                 raise error
 
     def delete_account_assignment(
@@ -120,7 +120,5 @@ class SSO:
             return response["AccountAssignmentDeletionStatus"]
         except botocore.exceptions.ClientError as error:
             if error.response["Error"]["Code"] != "ResourceNotFoundException":
-                logger.exception(
-                    f"Unable to delete {permission_set_arn} from {principal_id} in {account_id}"
-                )
+                logger.exception(f"Unable to delete {permission_set_arn} from {principal_id} in {account_id}")
                 raise error

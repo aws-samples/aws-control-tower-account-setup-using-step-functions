@@ -20,7 +20,7 @@
 """
 
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -46,8 +46,7 @@ PERMISSION_SET_NAMES = get_env_list("PERMISSION_SET_NAMES")
 @tracer.capture_lambda_handler
 @logger.inject_lambda_context(log_event=True)
 def handler(event: Dict[str, Any], context: LambdaContext) -> None:
-
-    account_id = event.get("account", {}).get("accountId")
+    account_id: Optional[str] = event.get("account", {}).get("accountId")
     if not account_id:
         raise Exception("Account ID not found in event")
 
@@ -73,11 +72,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> None:
         to_remove = existing_principals - role_arns
 
         for role_arn in to_add:
-            servicecatalog.associate_principal_with_portfolio(
-                portfolio_id=portfolio_id, principal_arn=role_arn
-            )
+            servicecatalog.associate_principal_with_portfolio(portfolio_id=portfolio_id, principal_arn=role_arn)
 
         for role_arn in to_remove:
-            servicecatalog.disassociate_principal_from_portfolio(
-                portfolio_id=portfolio_id, principal_arn=role_arn
-            )
+            servicecatalog.disassociate_principal_from_portfolio(portfolio_id=portfolio_id, principal_arn=role_arn)

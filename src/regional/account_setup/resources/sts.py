@@ -20,9 +20,13 @@
 """
 
 import os
+from typing import TYPE_CHECKING
 
 from aws_lambda_powertools import Logger
 import boto3
+
+if TYPE_CHECKING:
+    from mypy_boto3_sts import STSClient
 
 logger = Logger(child=True)
 EXECUTION_ROLE_NAME = os.environ["EXECUTION_ROLE_NAME"]
@@ -33,11 +37,9 @@ __all__ = ["STS"]
 
 class STS:
     def __init__(self, session: boto3.Session) -> None:
-        self.client = session.client("sts")
+        self.client: STSClient = session.client("sts")
 
-    def assume_role(
-        self, account_id: str, role_session_name: str = "AccountSetup"
-    ) -> boto3.Session:
+    def assume_role(self, account_id: str, role_session_name: str = "AccountSetup") -> boto3.Session:
         """
         Assume the AWSControlTowerExecution role in an account
         """

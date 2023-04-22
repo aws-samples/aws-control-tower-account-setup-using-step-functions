@@ -20,9 +20,12 @@
 """
 
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import boto3
+
+if TYPE_CHECKING:
+    from mypy_boto3_organizations import OrganizationsClient, ListAccountsPaginator
 
 __all__ = ["Organizations"]
 
@@ -30,7 +33,7 @@ __all__ = ["Organizations"]
 class Organizations:
     def __init__(self, session: boto3.Session) -> None:
         # @see https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/organizations.html
-        self.client = session.client(
+        self.client: OrganizationsClient = session.client(
             "organizations",
             region_name="us-east-1",
             endpoint_url="https://organizations.us-east-1.amazonaws.com",
@@ -41,7 +44,7 @@ class Organizations:
         """
         Return the account ID
         """
-        paginator = self.client.get_paginator("list_accounts")
+        paginator: ListAccountsPaginator = self.client.get_paginator("list_accounts")
         page_iterator = paginator.paginate(PaginationConfig={"PageSize": 100})
         for page in page_iterator:
             for account in page.get("Accounts", []):

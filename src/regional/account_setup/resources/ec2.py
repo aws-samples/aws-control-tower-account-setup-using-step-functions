@@ -19,10 +19,13 @@
 * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from aws_lambda_powertools import Logger
 import boto3
+
+if TYPE_CHECKING:
+    from mypy_boto3_ec2 import EC2Client, EC2ServiceResource
 
 logger = Logger(child=True)
 
@@ -31,7 +34,7 @@ __all__ = ["EC2"]
 
 class EC2:
     def __init__(self, session: boto3.Session, region: str) -> None:
-        self.client = session.client("ec2", region_name=region)
+        self.client: EC2Client = session.client("ec2", region_name=region)
         self.session = session
         self.region_name = region
 
@@ -43,11 +46,11 @@ class EC2:
             if vpc["IsDefault"]:
                 return vpc["VpcId"]
 
-        logger.debug("No default VPC found")
+        logger.debug(f"No default VPC found in {self.region_name}", region=self.region_name)
         return None
 
     def delete_vpc(self, vpc_id: str) -> None:
-        ec2 = self.session.resource("ec2", region_name=self.region_name)
+        ec2: EC2ServiceResource = self.session.resource("ec2", region_name=self.region_name)
         vpc = ec2.Vpc(vpc_id)
 
         # detach and delete all gateways associated with the vpc
@@ -78,12 +81,16 @@ class EC2:
                 nacl.delete()
 
         # DHCP Options
-        if vpc.dhcp_options:
-            vpc.associate_dhcp_options(
-                DhcpOptionsId="default"
-            )  # associate no DHCP options
-            vpc.dhcp_options.delete()
+        if vpc.dhcp_options and vpc.dhcp_options_id != "default":
+            dhcp_options_id = vpc.dhcp_options_id
+
+            vpc.associate_dhcp_options(DhcpOptionsId="default")  # associate no DHCP options
+
+            dhcp_options = ec2.DhcpOptions(dhcp_options_id)
+            dhcp_options.delete()
 
         # Delete VPC
         self.client.delete_vpc(VpcId=vpc_id)
-        logger.info(f"VPC {vpc_id} and associated resources has been deleted.")
+        logger.info(
+            f"VPC {vpc_id} and associated resources has been deleted in {self.region_name}.", region=self.region_name
+        )

@@ -20,8 +20,12 @@
 """
 
 import os
+from typing import TYPE_CHECKING, Optional
 
 import boto3
+
+if TYPE_CHECKING:
+    from mypy_boto3_sts import STSClient
 
 EXECUTION_ROLE_NAME = os.environ["EXECUTION_ROLE_NAME"]
 AWS_PARTITION = os.environ["AWS_PARTITION"]
@@ -30,10 +34,10 @@ __all__ = ["STS"]
 
 
 class STS:
-    def __init__(self, session: boto3.Session = None) -> None:
+    def __init__(self, session: Optional[boto3.Session] = None) -> None:
         if not session:
             session = boto3._get_default_session()
-        self.client = session.client("sts")
+        self.client: STSClient = session.client("sts")
 
     def assume_role(self, account_id: str, role_session_name: str) -> boto3.Session:
         """

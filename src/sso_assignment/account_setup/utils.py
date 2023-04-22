@@ -31,7 +31,7 @@ def get_env_list(key: str) -> List[str]:
     """
     Return an optional environment variable as a list
     """
-    value = os.environ.get(key, "").split(",")
+    value = os.getenv(key, "").split(",")
     return list(filter(None, value))
 
 
@@ -42,14 +42,13 @@ def parse_group(group_name: str) -> Tuple[Optional[str], str]:
     account_name = None
     permission_set_name = None
 
-    # AWS-A-AccountA-DeveloperAccess
+    # ex. AWS-A-AccountA-DeveloperAccess
     if group_name.startswith(GROUP_ACCOUNT_PREFIX):
-
         group_parts = group_name.replace(GROUP_ACCOUNT_PREFIX, "").rsplit("-", 1)
         account_name = group_parts[2]  # AccountA
         permission_set_name = group_parts[3]  # DeveloperAccess
 
-    # AWS-O-AWSReadOnlyAccess
+    # ex. AWS-O-AWSReadOnlyAccess
     elif group_name.startswith(GROUP_ORG_PREFIX):
         group_parts = group_name.split("-", 2)
         permission_set_name = group_parts[2]  # AWSReadOnlyAccess

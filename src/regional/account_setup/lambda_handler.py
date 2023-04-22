@@ -37,21 +37,24 @@ logger = Logger()
 @tracer.capture_lambda_handler
 @logger.inject_lambda_context(log_event=True)
 def handler(event: Dict[str, Any], context: LambdaContext) -> None:
-
     account_id = event["account_id"]
     region_name = event["region"]
 
     logger.append_keys(account_id=account_id, region=region_name)
+    tracer.put_annotation("AccountId", account_id)
+    tracer.put_annotation("Region", region_name)
 
     session = boto3.Session()
 
     assumed_session = STS(session).assume_role(account_id)
 
-    logger.info(f"Deleting default VPC from {region_name} in {account_id}")
     ec2 = EC2(assumed_session, region_name)
     default_vpc_id = ec2.get_default_vpc_id()
     if default_vpc_id:
+        logger.info(f"Deleting default VPC {default_vpc_id} from {region_name} in {account_id}")
         ec2.delete_vpc(default_vpc_id)
+    else:
+        logger.debug(f"No default VPC found in {region_name} in {account_id}")
 
     logger.info(f"Setting default ECS settings in {region_name} in {account_id}")
     ecs = ECS(assumed_session, region_name)

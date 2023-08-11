@@ -33,6 +33,8 @@ Parameters:
 
 Globals:
   Function:
+    Architectures:
+      - arm64
     Environment:
       Variables:
         POWERTOOLS_METRICS_NAMESPACE: AccountSetup
@@ -43,7 +45,7 @@ Globals:
     Layers:
       - !Ref DependencyLayer
     MemorySize: 128 # megabytes
-    Runtime: python3.10
+    Runtime: python3.11
     Tags:
       GITHUB_ORG: !Ref GitHubOrg
       GITHUB_REPO: !Ref GitHubRepo
@@ -64,11 +66,14 @@ Resources:
   DependencyLayer:
     Type: "AWS::Serverless::LayerVersion"
     Metadata:
-      BuildMethod: python3.10
+      BuildMethod: python3.11
+      BuildArchitecture: arm64
     Properties:
       LicenseInfo: MIT-0
+      CompatibleArchitectures:
+        - arm64
       CompatibleRuntimes:
-        - python3.10
+        - python3.11
       ContentUri: dependencies
       Description: DO NOT DELETE - AccountSetup - Latest versions of common Python packages
       RetentionPolicy: Delete

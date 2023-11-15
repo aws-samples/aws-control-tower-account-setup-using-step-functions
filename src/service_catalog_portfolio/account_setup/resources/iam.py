@@ -51,7 +51,7 @@ class IAM:
         page_iterator = paginator.paginate(PaginationConfig={"PageSize": 1000})
         for page in page_iterator:
             for role in page.get("Roles", []):
-                if role["RoleName"].startswith(AWS_SSO_ROLE_PREFIX):
+                if role.get("RoleName", "").startswith(AWS_SSO_ROLE_PREFIX):
                     # AWSReservedSSO_AWSAdministratorAccess_a1ff75f56dfb0e2f -> AWSAdministratorAccess
                     permission_set_name = role["RoleName"].rsplit("_", 1)[0].replace(AWS_SSO_ROLE_PREFIX, "")
                     roles[permission_set_name] = role["Arn"]

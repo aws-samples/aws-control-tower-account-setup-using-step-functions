@@ -37,8 +37,9 @@ logger = Logger()
 @tracer.capture_lambda_handler
 @logger.inject_lambda_context(log_event=True)
 def handler(event: Dict[str, Any], context: LambdaContext) -> None:
-    account_id = event["account_id"]
-    region_name = event["region"]
+    account_id = event["AccountId"]
+    region_name = event["Region"]
+    execution_role_arn = event["ExecutionRoleArn"]
 
     logger.append_keys(account_id=account_id, region=region_name)
     tracer.put_annotation("AccountId", account_id)
@@ -46,7 +47,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> None:
 
     session = boto3.Session()
 
-    assumed_session = STS(session).assume_role(account_id)
+    assumed_session = STS(session).assume_role(execution_role_arn)
 
     ec2 = EC2(assumed_session, region_name)
     default_vpc_id = ec2.get_default_vpc_id()
@@ -56,6 +57,11 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> None:
     else:
         logger.debug(f"No default VPC found in {region_name} in {account_id}")
 
+    # TODO 11/15: move this into the state machine once the aws-sdk integration has been updated
+    logger.info(f"Enabling snapshot block public access in {region_name} in {account_id}")
+    ec2.enable_snapshot_block_public_access()
+
     logger.info(f"Setting default ECS settings in {region_name} in {account_id}")
     ecs = ECS(assumed_session, region_name)
     ecs.put_account_setting_default()
+

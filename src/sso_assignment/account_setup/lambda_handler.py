@@ -95,7 +95,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> None:
 
     # Below handles organizational groups
 
-    account_id: Optional[str] = event.get("account", {}).get("accountId")
+    account_id: Optional[str] = event.get("AccountId")
     if not account_id:
         raise Exception("Account ID not found in event")
 

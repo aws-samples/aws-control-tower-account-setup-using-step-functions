@@ -38,9 +38,7 @@ Globals:
     Environment:
       Variables:
         POWERTOOLS_METRICS_NAMESPACE: AccountSetup
-        EXECUTION_ROLE_NAME: !Ref ExecutionRoleName
         LOG_LEVEL: INFO
-        AWS_PARTITION: !Ref "AWS::Partition"
     Handler: lambda_handler.handler
     Layers:
       - !Ref DependencyLayer
@@ -348,13 +346,20 @@ Resources:
     Type: "AWS::Serverless::StateMachine"
     Properties:
       Definition:
-        StartAt: UpdatePasswordPolicy
+        StartAt: BuildParameters
         States:
+          BuildParameters:
+            Type: Pass
+            InputPath: "$.account"
+            Parameters:
+              "AccountId.$": "$.accountId"
+              "ExecutionRoleArn.$": "States.Format('arn:aws:iam::{}:role/${ExecutionRoleName}', $.accountId)"
+            Next: UpdatePasswordPolicy
           UpdatePasswordPolicy:
             Type: Task
             Resource: "arn:aws:states:::aws-sdk:iam:updateAccountPasswordPolicy"
             Credentials:
-              "RoleArn.$": "States.Format('arn:aws:iam::{}:role/${ExecutionRoleName}', $.account.accountId)"
+              "RoleArn.$": "$.ExecutionRoleArn"
             Parameters:
               MinimumPasswordLength: 14  # https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cis-controls.html#securityhub-cis-controls-1.9
               RequireSymbols: true  # https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cis-controls.html#securityhub-cis-controls-1.7
@@ -371,14 +376,14 @@ Resources:
             Type: Task
             Resource: "arn:aws:states:::aws-sdk:s3control:putPublicAccessBlock"
             Credentials:
-              "RoleArn.$": "States.Format('arn:aws:iam::{}:role/${ExecutionRoleName}', $.account.accountId)"
+              "RoleArn.$": "$.ExecutionRoleArn"
             Parameters:
               PublicAccessBlockConfiguration:
                 BlockPublicAcls: true
                 IgnorePublicAcls: true
                 BlockPublicPolicy: true
                 RestrictPublicBuckets: true
-              "AccountId.$": $.account.accountId
+              "AccountId.$": "$.AccountId"
             ResultPath: null # discard result and keep original input
             Next: Route53PolicyDocument
           Route53PolicyDocument:
@@ -413,10 +418,10 @@ Resources:
             Type: Task
             Resource: "arn:aws:states:::aws-sdk:cloudwatchlogs:putResourcePolicy"
             Credentials:
-              "RoleArn.$": "States.Format('arn:aws:iam::{}:role/${ExecutionRoleName}', $.account.accountId)"
+              "RoleArn.$": "$.ExecutionRoleArn"
             Parameters:
               PolicyName: AWSServiceRoleForRoute53
-              "PolicyDocument.$": States.Format($.Policy.PolicyDocument, $.account.accountId, $.account.accountId)
+              "PolicyDocument.$": States.Format($.Policy.PolicyDocument, $.AccountId, $.AccountId)
             ResultPath: null # discard result and keep original input
             Next: DescribeRegions
           DescribeRegions:
@@ -436,17 +441,18 @@ Resources:
             Type: Map
             ItemsPath: "$.Regions.RegionNames"
             MaxConcurrency: 0
-            Parameters:
-              "account_id.$": "$.account.accountId"
-              "region.$": "$$.Map.Item.Value"
-            Iterator:
+            ItemSelector:
+              "AccountId.$": "$.AccountId"
+              "Region.$": "$$.Map.Item.Value"
+              "ExecutionRoleArn.$": "$.ExecutionRoleArn"
+            ItemProcessor:
               StartAt: EbsEncryptionByDefault
               States:
                 EbsEncryptionByDefault:
                   Type: Task
                   Resource: "arn:aws:states:::aws-sdk:ec2:enableEbsEncryptionByDefault"
                   Credentials:
-                    "RoleArn.$": "States.Format('arn:aws:iam::{}:role/${ExecutionRoleName}', $.account_id)"
+                    "RoleArn.$": "$.ExecutionRoleArn"
                   Parameters: {}
                   ResultPath: null # discard result and keep original input
                   Next: DisableSsmPublicSharing
@@ -454,16 +460,19 @@ Resources:
                   Type: Task
                   Resource: "arn:aws:states:::aws-sdk:ssm:updateServiceSetting"
                   Credentials:
-                    "RoleArn.$": "States.Format('arn:aws:iam::{}:role/${ExecutionRoleName}', $.account_id)"
+                    "RoleArn.$": "$.ExecutionRoleArn"
                   Parameters:
-                    "SettingId.$": "States.Format('arn:aws:ssm:{}:{}:servicesetting/ssm/documents/console/public-sharing-permission', $.region, $.account_id)"
+                    "SettingId.$": "States.Format('arn:aws:ssm:{}:{}:servicesetting/ssm/documents/console/public-sharing-permission', $.Region, $.AccountId)"
                     SettingValue: Disable
                   Catch:
                     - ErrorEquals:
                         - States.ALL
                       ResultPath: null # discard result and keep original input
-                      Next: Regional
+                      Next: IgnoreError
                   ResultPath: null # discard result and keep original input
+                  Next: Regional
+                IgnoreError:
+                  Type: Pass
                   Next: Regional
                 Regional:
                   Type: Task

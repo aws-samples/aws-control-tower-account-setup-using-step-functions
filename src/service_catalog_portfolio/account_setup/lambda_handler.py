@@ -20,12 +20,14 @@
 """
 
 import os
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from aws_lambda_powertools.utilities.validation import validator
 
-from .resources import IAM, ServiceCatalog, STS
+from account_setup.resources import IAM, ServiceCatalog, STS
+from account_setup.schemas import INPUT
 
 tracer = Tracer()
 logger = Logger()
@@ -35,7 +37,7 @@ def get_env_list(key: str) -> List[str]:
     """
     Return an optional environment variable as a list
     """
-    value = os.environ.get(key, "").split(",")
+    value = os.getenv(key, "").split(",")
     return list(filter(None, value))
 
 
@@ -43,14 +45,11 @@ PORTFOLIO_IDS = get_env_list("PORTFOLIO_IDS")
 PERMISSION_SET_NAMES = get_env_list("PERMISSION_SET_NAMES")
 
 
+@validator(inbound_schema=INPUT)
 @tracer.capture_lambda_handler
 @logger.inject_lambda_context(log_event=True)
 def handler(event: Dict[str, Any], context: LambdaContext) -> None:
-    account_id: Optional[str] = event.get("account", {}).get("accountId")
-    if not account_id:
-        raise Exception("Account ID not found in event")
-
-    session = STS().assume_role(account_id, "service_catalog_portfolio")
+    session = STS().assume_role(event["ExecutionRoleArn"], "service_catalog_portfolio")
 
     iam = IAM(session)
 

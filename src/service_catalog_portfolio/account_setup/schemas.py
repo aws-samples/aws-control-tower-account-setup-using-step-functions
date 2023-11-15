@@ -19,39 +19,13 @@
 * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from typing import TYPE_CHECKING
-
-from aws_lambda_powertools import Logger
-import boto3
-
-if TYPE_CHECKING:
-    from mypy_boto3_sts import STSClient
-
-logger = Logger(child=True)
-
-__all__ = ["STS"]
-
-
-class STS:
-    def __init__(self, session: boto3.Session) -> None:
-        self.client: STSClient = session.client("sts")
-
-    def assume_role(self, role_arn: str, role_session_name: str = "AccountSetup") -> boto3.Session:
-        """
-        Assume the AWSControlTowerExecution role in an account
-        """
-
-        logger.info(f"Assuming role {role_arn}")
-        response = self.client.assume_role(
-            RoleArn=role_arn,
-            RoleSessionName=role_session_name,
-            DurationSeconds=900,  # shortest duration 15 minutes
-        )
-
-        credentials = response["Credentials"]
-
-        return boto3.Session(
-            aws_access_key_id=credentials["AccessKeyId"],
-            aws_secret_access_key=credentials["SecretAccessKey"],
-            aws_session_token=credentials["SessionToken"],
-        )
+INPUT = {
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "type": "object",
+    "properties": {
+        "ExecutionRoleArn": {
+            "type": "string",
+        },
+    },
+    "required": ["ExecutionRoleArn"],
+}

@@ -23,6 +23,7 @@ from typing import Optional, TYPE_CHECKING
 
 from aws_lambda_powertools import Logger
 import boto3
+import botocore
 
 if TYPE_CHECKING:
     from mypy_boto3_ec2 import EC2Client, EC2ServiceResource
@@ -39,11 +40,20 @@ class EC2:
         self.region_name = region
 
     def get_default_vpc_id(self) -> Optional[str]:
-        params = {"Filters": [{"Name": "isDefault", "Values": ["true"]}]}
+        params = {
+            "Filters": [
+                {
+                    "Name": "isDefault",
+                    "Values": [
+                        "true",
+                    ],
+                }
+            ]
+        }
 
         response = self.client.describe_vpcs(**params)
         for vpc in response.get("Vpcs", []):
-            if vpc["IsDefault"]:
+            if vpc.get("IsDefault", False):
                 return vpc["VpcId"]
 
         logger.debug(f"No default VPC found in {self.region_name}", region=self.region_name)
@@ -94,3 +104,9 @@ class EC2:
         logger.info(
             f"VPC {vpc_id} and associated resources has been deleted in {self.region_name}.", region=self.region_name
         )
+
+    def enable_snapshot_block_public_access(self) -> None:
+        try:
+            self.client.enable_snapshot_block_public_access(State="block-all-sharing")
+        except botocore.exceptions.ClientError:
+            logger.exception(f"Unable to enable snapshot block public access in {self.region}")

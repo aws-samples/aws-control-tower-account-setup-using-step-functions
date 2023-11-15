@@ -19,16 +19,15 @@
 * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import os
 from typing import TYPE_CHECKING, Optional
 
+from aws_lambda_powertools import Logger
 import boto3
 
 if TYPE_CHECKING:
     from mypy_boto3_sts import STSClient
 
-EXECUTION_ROLE_NAME = os.environ["EXECUTION_ROLE_NAME"]
-AWS_PARTITION = os.environ["AWS_PARTITION"]
+logger = Logger(child=True)
 
 __all__ = ["STS"]
 
@@ -39,12 +38,11 @@ class STS:
             session = boto3._get_default_session()
         self.client: STSClient = session.client("sts")
 
-    def assume_role(self, account_id: str, role_session_name: str) -> boto3.Session:
+    def assume_role(self, role_arn: str, role_session_name: str) -> boto3.Session:
         """
         Assume a role and return a new boto3 session
         """
-        role_arn = f"arn:{AWS_PARTITION}:iam::{account_id}:role/{EXECUTION_ROLE_NAME}"
-
+        logger.info(f"Assuming role {role_arn}")
         response = self.client.assume_role(
             RoleArn=role_arn,
             RoleSessionName=role_session_name,

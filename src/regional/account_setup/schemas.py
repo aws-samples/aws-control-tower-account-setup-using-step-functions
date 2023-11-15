@@ -23,12 +23,15 @@ INPUT = {
     "$schema": "http://json-schema.org/draft-07/schema",
     "type": "object",
     "properties": {
-        "account_id": {
+        "AccountId": {
             "type": "string",
         },
-        "region": {
+        "Region": {
+            "type": "string",
+        },
+        "ExecutionRoleArn": {
             "type": "string",
         },
     },
-    "required": ["account_id", "region"],
+    "required": ["AccountId", "Region", "ExecutionRoleArn"],
 }

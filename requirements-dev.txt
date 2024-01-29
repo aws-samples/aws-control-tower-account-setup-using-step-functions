@@ -7,5 +7,5 @@ mypy-boto3-iam==1.34.8
 mypy-boto3-identitystore==1.34.0
 mypy-boto3-organizations==1.34.24
 mypy-boto3-sts==1.34.0
-mypy-boto3-servicecatalog==1.34.0
+mypy-boto3-servicecatalog==1.34.13
 mypy-boto3-sso-admin==1.34.0

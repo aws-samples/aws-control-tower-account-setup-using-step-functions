@@ -64,4 +64,3 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> None:
     logger.info(f"Setting default ECS settings in {region_name} in {account_id}")
     ecs = ECS(assumed_session, region_name)
     ecs.put_account_setting_default()
-

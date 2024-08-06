@@ -1,9 +1,9 @@
-black==24.4.2
+black==24.8.0
 wheel==0.44.0
-pre-commit==3.7.0
-mypy-boto3-ec2==1.34.143
+pre-commit==3.8.0
+mypy-boto3-ec2==1.34.149
 mypy-boto3-ecs==1.34.123
-mypy-boto3-iam==1.34.8
+mypy-boto3-iam==1.34.152
 mypy-boto3-identitystore==1.34.0
 mypy-boto3-organizations==1.34.139
 mypy-boto3-sts==1.34.0

@@ -1,1 +1,1 @@
-aws-lambda-powertools[tracer,validation,aws-sdk]==2.42.0
+aws-lambda-powertools[tracer,validation,aws-sdk]==2.43.0

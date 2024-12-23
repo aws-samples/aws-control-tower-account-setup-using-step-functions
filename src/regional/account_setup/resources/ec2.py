@@ -110,3 +110,9 @@ class EC2:
             self.client.enable_snapshot_block_public_access(State="block-all-sharing")
         except botocore.exceptions.ClientError:
             logger.exception(f"Unable to enable snapshot block public access in {self.region}")
+
+    def enable_ami_block_public_access(self) -> None:
+        try:
+            self.client.enable_image_block_public_access(ImageBlockPublicAccessState="block-all-sharing")
+        except botocore.exceptions.ClientError:
+            logger.exception(f"Unable to enable AMI block public access in {self.region_name}")

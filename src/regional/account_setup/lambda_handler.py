@@ -61,6 +61,9 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> None:
     logger.info(f"Enabling snapshot block public access in {region_name} in {account_id}")
     ec2.enable_snapshot_block_public_access()
 
+    logger.info(f"Enabling AMI block public access in {region_name} in {account_id}")
+    ec2.enable_ami_block_public_access()
+
     logger.info(f"Setting default ECS settings in {region_name} in {account_id}")
     ecs = ECS(assumed_session, region_name)
     ecs.put_account_setting_default()

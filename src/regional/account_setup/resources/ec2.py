@@ -113,6 +113,6 @@ class EC2:
 
     def enable_ami_block_public_access(self) -> None:
         try:
-            self.client.enable_image_block_public_access(ImageBlockPublicAccessState="block-all-sharing")
+            self.client.enable_image_block_public_access(ImageBlockPublicAccessState="block-new-sharing")
         except botocore.exceptions.ClientError:
             logger.exception(f"Unable to enable AMI block public access in {self.region_name}")
